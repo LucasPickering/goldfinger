@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Goldfinger</title>
+  </head>
+  <body>
+    <form action="/lcd" method="post">
+      <div>
+        <select id="lcd-mode" name="mode">
+          <option value="off">Off</option>
+          <option value="clock">Clock</option>
+        </select>
+      </div>
+
+      <div>
+        <input type="color" id="lcd-color" name="color" value="#ffffff" />
+        <label for="lcd-color">LCD Color</label>
+      </div>
+
+      <button type="submit">Save</button>
+    </form>
+  </body>
+</html>

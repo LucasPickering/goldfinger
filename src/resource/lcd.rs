@@ -5,6 +5,7 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use chrono::Local;
 use log::trace;
+use rocket::{FromForm, FromFormField};
 use serde::{Deserialize, Serialize};
 use serialport::SerialPort;
 use std::io::Write;
@@ -24,14 +25,22 @@ pub struct Lcd {
 }
 
 /// User-facing LCD state
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, FromForm)]
 pub struct LcdUserState {
     pub mode: LcdMode,
     pub color: Color,
 }
 
 #[derive(
-    Copy, Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize,
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    FromFormField,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum LcdMode {

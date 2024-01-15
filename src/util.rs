@@ -1,9 +1,11 @@
 use anyhow::anyhow;
 use log::info;
+use rocket::form::{DataField, FromFormField, ValueField};
 use serde::{Deserialize, Serialize};
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 use std::{
     fmt::Display,
+    future::Future,
     io::{Read, Write},
     str::FromStr,
     time::Duration,
@@ -95,6 +97,12 @@ impl TryFrom<String> for Color {
 impl From<Color> for String {
     fn from(color: Color) -> Self {
         color.to_string()
+    }
+}
+
+impl<'a> FromFormField<'a> for Color {
+    fn from_value(field: ValueField<'a>) -> rocket::form::Result<'a, Self> {
+        field.value.parse().map_err(|error| todo!())
     }
 }
 

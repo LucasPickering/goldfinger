@@ -14,6 +14,9 @@ use tokio::sync::RwLock;
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 struct Args {
+    /// TODO
+    #[clap(default_value = "127.0.0.1:8000")]
+    host: String,
     /// Path to the LCD serial port. If not specified, a mock will be used
     #[clap(long)]
     lcd: Option<String>,
@@ -38,6 +41,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Primary task will run the API
+    // TODO pass host/port
     api::start(user_state).await
 }
 

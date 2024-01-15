@@ -1,5 +1,5 @@
 [package]
-description = "API and control system for a Raspberry PI with character LCD"
+description = "API and control system for a Raspberry Pi with character LCD"
 edition = "2021"
 name = "goldfinger"
 version = "0.1.0"
@@ -7,7 +7,7 @@ version = "0.1.0"
 [dependencies]
 anyhow = {version = "1.0.72", features = ["backtrace"]}
 chrono = {version = "0.4.31", default-features = false, features = ["clock"]}
-clap = { version = "4.4.17", features = ["derive"] }
+clap = {version = "4.4.17", features = ["derive"]}
 env_logger = "0.10.1"
 log = "0.4.20"
 rocket = {version = "0.5.0", features = ["json"]}

@@ -5,11 +5,12 @@ name = "goldfinger"
 version = "0.1.0"
 
 [dependencies]
-anyhow = {version = "^1.0.72", features = ["backtrace"]}
-chrono = {version = "0.4.31", default-features = false}
+anyhow = {version = "1.0.72", features = ["backtrace"]}
+chrono = {version = "0.4.31", default-features = false, features = ["clock"]}
+clap = { version = "4.4.17", features = ["derive"] }
 env_logger = "0.10.1"
 log = "0.4.20"
-rocket = { version = "0.5.0", features = ["json"] }
-serde = { version = "1.0.195", features = ["derive"] }
-serialport = "^4.3.0"
-tokio = {version = "^1.35.1", default-features = false, features = ["full"]}
+rocket = {version = "0.5.0", features = ["json"]}
+serde = {version = "1.0.195", features = ["derive"]}
+serialport = "4.3.0"
+tokio = {version = "1.35.1", default-features = false, features = ["full"]}

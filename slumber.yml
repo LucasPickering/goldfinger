@@ -1,0 +1,28 @@
+profiles:
+  local:
+    name: Local
+    data:
+      host: http://localhost:8000
+
+base: &base
+  headers:
+    Accept: application/json
+    Content-Type: application/json
+
+requests:
+  get_lcd:
+    <<: *base
+    name: Get LCD
+    method: GET
+    url: "{{host}}/lcd"
+
+  set_lcd:
+    <<: *base
+    name: Set LCD
+    method: PUT
+    url: "{{host}}/lcd"
+    body: >
+      {
+        "color": "#ff0000",
+        "mode": "clock"
+      }

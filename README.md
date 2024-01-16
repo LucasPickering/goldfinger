@@ -35,15 +35,18 @@ Specified pin numbers use the **hardware** pin numbering system.
 | LCD GND | 6     |
 | LCD TX  | 8     |
 
-## Deployment
+## Development
 
-The executable is cross-compiled for the Raspberry Pi, then copied over with a script.
+### Prerequisites
 
-For MacOS, you need to install the correct linker:
+- `brew install socat`
+- `brew install arm-linux-gnueabihf-binutils` (for deployment only)
 
-```sh
-brew install arm-linux-gnueabihf-binutils
-```
+TODO add instructions on using socat
+
+### Deployment
+
+The executable is cross-compiled for the Raspberry Pi, then copied over with a script. Make sure you installed the correct linker in the prerequisites.
 
 After any changes, deploy with:
 

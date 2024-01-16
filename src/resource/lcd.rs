@@ -1,10 +1,7 @@
-use crate::{
-    resource::Resource,
-    util::{Color, MockSerialPort},
-};
+use crate::{resource::Resource, util::Color};
 use anyhow::{anyhow, bail, Context};
 use chrono::Local;
-use log::trace;
+use log::{info, trace};
 use rocket::{FromForm, FromFormField};
 use serde::{Deserialize, Serialize};
 use serialport::SerialPort;
@@ -14,8 +11,6 @@ use std::io::Write;
 const LCD_WIDTH: usize = 20;
 /// Height of the LCD in lines
 const LCD_HEIGHT: usize = 4;
-/// Serial connection baud rate
-const BAUD_RATE: u32 = 9600;
 
 /// LCD resource, to manage state calculation and hardware communication
 pub struct Lcd {
@@ -29,6 +24,15 @@ pub struct Lcd {
 pub struct LcdUserState {
     pub mode: LcdMode,
     pub color: Color,
+}
+
+/// Serial port config, to be loaded from Rocket config
+#[derive(Deserialize)]
+pub struct LcdConfig {
+    #[serde(rename = "lcd_baud_rate")]
+    baud_rate: u32,
+    #[serde(rename = "lcd_port")]
+    port: String,
 }
 
 #[derive(
@@ -49,60 +53,11 @@ pub enum LcdMode {
     Clock,
 }
 
-impl Resource for Lcd {
-    type UserState = LcdUserState;
-
-    fn name(&self) -> &str {
-        "LCD"
-    }
-
-    fn on_start(&mut self) -> anyhow::Result<()> {
-        self.serial.command(LcdCommand::Clear)?; // Reset text state
-        self.serial.command(LcdCommand::BacklightOn)?;
-
-        // Generally this init only needs to be done once ever, but it's safer
-        // to do it on every startup
-        self.serial.command(LcdCommand::SetSize {
-            width: LCD_WIDTH as u8,
-            height: LCD_HEIGHT as u8,
-        })?;
-        self.serial
-            .command(LcdCommand::SetContrast { contrast: 255 })?;
-        self.serial
-            .command(LcdCommand::SetBrightness { brightness: 255 })?;
-        for &character in CustomCharacter::ALL {
-            self.serial.command(LcdCommand::SaveCustomCharacter {
-                bank: 0,
-                character,
-            })?;
-        }
-        self.serial
-            .command(LcdCommand::LoadCharacterBank { bank: 0 })
-    }
-
-    fn on_tick(&mut self, user_state: &Self::UserState) -> anyhow::Result<()> {
-        match user_state.mode {
-            LcdMode::Off => {
-                self.serial.command(LcdCommand::BacklightOff)?;
-                self.serial.command(LcdCommand::Clear)?;
-            }
-            LcdMode::Clock => {
-                self.set_color(user_state.color)?;
-                self.set_text(get_clock_text()?)?;
-            }
-        }
-        Ok(())
-    }
-}
-
 impl Lcd {
-    pub fn new(serial_port: Option<&str>) -> anyhow::Result<Self> {
-        // If a serial port was given, connect to it. If not, use a mock
-        let serial = if let Some(serial_port) = serial_port {
-            serialport::new(serial_port, BAUD_RATE).open()?
-        } else {
-            Box::<MockSerialPort>::default()
-        };
+    pub fn new(config: &LcdConfig) -> anyhow::Result<Self> {
+        let serial = serialport::new(&config.port, config.baud_rate)
+            .open()
+            .context(format!("Error connecting to LCD at {}", config.port))?;
 
         Ok(Self {
             color: Color::default(),
@@ -179,6 +134,59 @@ impl Lcd {
         }
 
         Ok(())
+    }
+}
+
+impl Resource for Lcd {
+    type UserState = LcdUserState;
+
+    fn name(&self) -> &str {
+        "LCD"
+    }
+
+    fn on_start(&mut self) -> anyhow::Result<()> {
+        self.serial.command(LcdCommand::Clear)?; // Reset text state
+        self.serial.command(LcdCommand::BacklightOn)?;
+
+        // Generally this init only needs to be done once ever, but it's safer
+        // to do it on every startup
+        self.serial.command(LcdCommand::SetSize {
+            width: LCD_WIDTH as u8,
+            height: LCD_HEIGHT as u8,
+        })?;
+        self.serial
+            .command(LcdCommand::SetContrast { contrast: 255 })?;
+        self.serial
+            .command(LcdCommand::SetBrightness { brightness: 255 })?;
+        for &character in CustomCharacter::ALL {
+            self.serial.command(LcdCommand::SaveCustomCharacter {
+                bank: 0,
+                character,
+            })?;
+        }
+        self.serial
+            .command(LcdCommand::LoadCharacterBank { bank: 0 })
+    }
+
+    fn on_tick(&mut self, user_state: &Self::UserState) -> anyhow::Result<()> {
+        match user_state.mode {
+            LcdMode::Off => {
+                self.serial.command(LcdCommand::BacklightOff)?;
+                self.serial.command(LcdCommand::Clear)?;
+            }
+            LcdMode::Clock => {
+                self.set_color(user_state.color)?;
+                self.set_text(get_clock_text()?)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Blanket Drop impls aren't possible so we need this on the implementor :(
+impl Drop for Lcd {
+    fn drop(&mut self) {
+        info!("Closing resource {}", self.name());
     }
 }
 

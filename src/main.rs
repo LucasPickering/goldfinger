@@ -3,21 +3,14 @@ mod resource;
 mod util;
 
 use crate::resource::{
-    lcd::{Lcd, LcdUserState},
+    lcd::{Lcd, LcdConfig, LcdUserState},
     Resource,
 };
 use anyhow::Context;
 use log::LevelFilter;
 use rocket_dyn_templates::Template;
-use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
-/// Additional fields to load from Rocket configuration
-#[derive(Deserialize)]
-struct Config {
-    lcd_serial_port: Option<String>,
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,26 +20,21 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     // TODO persist
-    let user_state = Arc::new(UserState::default());
+    let user_state = Arc::new(RwLock::new(LcdUserState::default()));
 
     // Set up main Rocket instance
     let rocket = rocket::build()
         .manage(Arc::clone(&user_state))
         .attach(Template::fairing());
     let rocket = api::mount_routes(rocket);
-    let config: Config = rocket.figment().extract()?;
+    let lcd_config: LcdConfig = rocket.figment().extract()?;
 
     // Spawn a background task to monitor/update hardware
-    let lcd = Lcd::new(config.lcd_serial_port.as_deref())?;
-    tokio::spawn(async move { lcd.run(&user_state.lcd).await });
+    let lcd = Lcd::new(&lcd_config)?;
+    lcd.spawn_task(Arc::clone(&user_state));
 
     // Primary task will run the API
     rocket.launch().await.context("Error starting API")?;
-    Ok(())
-}
 
-/// TODO move somewhere
-#[derive(Default)]
-struct UserState {
-    lcd: RwLock<LcdUserState>,
+    Ok(())
 }

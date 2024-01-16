@@ -2,26 +2,21 @@
 //! state
 
 use crate::{resource::lcd::LcdUserState, UserState};
-use anyhow::Context;
 use log::info;
-use rocket::{form::Form, fs::FileServer, routes, serde::json::Json, State};
+use rocket::{
+    form::Form, fs::FileServer, routes, serde::json::Json, Build, Rocket, State,
+};
 use rocket_dyn_templates::{context, Template};
 use std::sync::Arc;
 
-/// Launch the API
-pub async fn start(user_state: Arc<UserState>) -> anyhow::Result<()> {
-    rocket::build()
-        .manage(user_state)
-        .attach(Template::fairing())
+/// Attach all route handles to the given Rocket instance
+pub fn mount_routes(rocket: Rocket<Build>) -> Rocket<Build> {
+    rocket
         .mount(
             "/",
             routes![index, get_lcd_json, set_lcd_json, set_lcd_form],
         )
         .mount("/static", FileServer::from("./static"))
-        .launch()
-        .await
-        .context("Error starting API")?;
-    Ok(())
 }
 
 #[rocket::get("/")]

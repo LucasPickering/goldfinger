@@ -1,11 +1,10 @@
 use anyhow::anyhow;
 use log::info;
-use rocket::form::{DataField, FromFormField, ValueField};
+use rocket::form::{FromFormField, ValueField};
 use serde::{Deserialize, Serialize};
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
 use std::{
     fmt::Display,
-    future::Future,
     io::{Read, Write},
     str::FromStr,
     time::Duration,

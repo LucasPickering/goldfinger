@@ -34,3 +34,19 @@ Specified pin numbers use the **hardware** pin numbering system.
 | LCD 5V  | 4     |
 | LCD GND | 6     |
 | LCD TX  | 8     |
+
+## Deployment
+
+The executable is cross-compiled for the Raspberry Pi, then copied over with a script.
+
+For MacOS, you need to install the correct linker:
+
+```sh
+brew install arm-linux-gnueabihf-binutils
+```
+
+After any changes, deploy with:
+
+```sh
+./release.sh
+```

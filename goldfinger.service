@@ -1,0 +1,10 @@
+[Unit]
+Description=LCD control webserver
+
+[Service]
+ExecStart=./goldfinger
+WorkingDirectory=/home/pi/goldfinger
+Environment="ROCKET_PROFILE=release"
+
+[Install]
+WantedBy=multi-user.target

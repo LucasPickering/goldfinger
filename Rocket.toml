@@ -1,8 +1,8 @@
 [default]
-host = "127.0.0.1"
+address = "127.0.0.1"
 port = 8000
 
 [release]
-host = "0.0.0.0"
-lcd_serial_port = "TODO"
+address = "0.0.0.0"
+lcd_serial_port = "/dev/ttyAMA0"
 port = 80

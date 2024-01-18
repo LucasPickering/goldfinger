@@ -7,6 +7,7 @@
   <body>
     <form action="/lcd" method="post">
       <div>
+        {{!-- TODO pre-select mode --}}
         <select id="lcd-mode" name="mode">
           <option value="off">Off</option>
           <option value="clock">Clock</option>
@@ -14,7 +15,7 @@
       </div>
 
       <div>
-        <input type="color" id="lcd-color" name="color" value="#ffffff" />
+        <input type="color" id="lcd-color" name="color" value="{{color}}" />
         <label for="lcd-color">LCD Color</label>
       </div>
 

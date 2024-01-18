@@ -48,8 +48,8 @@ pub struct LcdConfig {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum LcdMode {
-    #[default]
     Off,
+    #[default] // TODO move back
     Clock,
 }
 
@@ -80,8 +80,6 @@ impl Lcd {
     /// settle. Input text is assumed to be ASCII, and have exactly [LCD_HEIGHT]
     /// lines.
     fn set_text(&mut self, text: LcdText) -> anyhow::Result<()> {
-        trace!("Setting LCD text to {text:x?}");
-
         // A list of groups that need their text updated. Each group will end
         // either at a non-diff byte, or end of line
         let mut diff_groups: Vec<TextGroup> = Vec::new();
@@ -101,10 +99,10 @@ impl Lcd {
         for y in 0..LCD_HEIGHT {
             for x in 0..LCD_WIDTH {
                 let old_byte = self.text.get(x, y);
-                let new_byte = self.text.get(x, y);
+                let new_byte = text.get(x, y);
 
                 // Save the new byte, then check if it's a diff
-                self.text.set(x, y, new_byte);
+                self.text.set(x, y, new_byte); // TODO move into else?
                 if old_byte == new_byte {
                     finish_group(&mut current_diff_group);
                 } else {
@@ -207,6 +205,7 @@ impl LcdSerialPort {
     /// Move the cursor to the given position, then write some text
     fn write_at(&mut self, x: u8, y: u8, text: &[u8]) -> anyhow::Result<()> {
         self.command(LcdCommand::CursorPos { x, y })?;
+        trace!("Writing text {text:?}");
         // Non-command bytes are interpreted as text
         // https://learn.adafruit.com/usb-plus-serial-backpack/sending-text
         self.0.write(text).with_context(|| {

@@ -7,7 +7,7 @@ use rocket::{
     form::Form, fs::FileServer, response::Redirect, routes, serde::json::Json,
     Build, Rocket, State,
 };
-use rocket_dyn_templates::{context, Template};
+use rocket_dyn_templates::Template;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -22,8 +22,8 @@ pub fn mount_routes(rocket: Rocket<Build>) -> Rocket<Build> {
 }
 
 #[rocket::get("/")]
-fn index() -> Template {
-    Template::render("index", context! {})
+async fn index(user_state: &State<Arc<RwLock<LcdUserState>>>) -> Template {
+    Template::render("index", *user_state.read().await)
 }
 
 /// Get current LCD settings via JSON

@@ -97,3 +97,28 @@ impl<'a> FromFormField<'a> for Color {
         field.value.parse().map_err(|_error| todo!())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_color() {
+        assert_eq!("#000000".parse::<Color>().unwrap(), Color::from(0x000000));
+        assert_eq!("#ff1234".parse::<Color>().unwrap(), Color::from(0xff1234));
+        assert_eq!("#FFFFFF".parse::<Color>().unwrap(), Color::from(0xffffff));
+
+        assert!("#fffff".parse::<Color>().is_err()); // Too short
+        assert!("#fffffff".parse::<Color>().is_err()); // Too long
+        assert!("ffffff".parse::<Color>().is_err()); // No #
+        assert!("@fffffg".parse::<Color>().is_err()); // Incorrect prefix
+        assert!("#fffffg".parse::<Color>().is_err()); // bad char
+    }
+
+    #[test]
+    fn test_display_color() {
+        assert_eq!(Color::from(0x000000).to_string().as_str(), "#000000");
+        assert_eq!(Color::from(0xff00ff).to_string().as_str(), "#ff00ff");
+        assert_eq!(Color::from(0xffffff).to_string().as_str(), "#ffffff");
+    }
+}

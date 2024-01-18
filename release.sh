@@ -11,7 +11,6 @@ cargo build -v --release --target $PI_TARGET
 rsync -r $FILES $PI_HOST:$GOLDFINGER_DIR
 ssh $PI_HOST << EOF
     sudo systemctl link $GOLDFINGER_DIR/goldfinger.service
-    sudo systemctl daemon-reload
     sudo systemctl enable goldfinger
     sudo systemctl restart goldfinger
 EOF

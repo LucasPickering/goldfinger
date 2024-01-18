@@ -12,6 +12,15 @@ const LCD_WIDTH: usize = 20;
 /// Height of the LCD in lines
 const LCD_HEIGHT: usize = 4;
 
+// Convenient consts for building up jumbo characters
+const HBR: u8 = CustomCharacter::HalfBottomRight.tag();
+const HBL: u8 = CustomCharacter::HalfBottomLeft.tag();
+const BOT: u8 = CustomCharacter::Bottom.tag();
+const FBR: u8 = CustomCharacter::FullBottomRight.tag();
+const FBL: u8 = CustomCharacter::FullBottomLeft.tag();
+const FUL: u8 = 0xff; // Solid block (built-in to the LCD)
+const EMT: u8 = b' '; // Empty
+
 /// LCD resource, to manage state calculation and hardware communication
 pub struct Lcd {
     color: Color,
@@ -171,6 +180,9 @@ impl Resource for Lcd {
             LcdMode::Off => {
                 self.serial.command(LcdCommand::BacklightOff)?;
                 self.serial.command(LcdCommand::Clear)?;
+                // Reset internal buffer so we reprint everything when switching
+                // out of this mode
+                self.text.clear();
             }
             LcdMode::Clock => {
                 self.set_color(user_state.color)?;
@@ -231,6 +243,10 @@ impl LcdText {
 
     fn set(&mut self, x: usize, y: usize, value: u8) {
         self.lines[y][x] = value;
+    }
+
+    fn clear(&mut self) {
+        self.lines = [[b' '; LCD_WIDTH]; LCD_HEIGHT];
     }
 
     /// Get a slice into a single line in the text. This assumes the
@@ -459,15 +475,24 @@ fn write_jumbo_text(
     line_buffer: &mut [[u8; LCD_WIDTH]; 3],
     text: &str,
 ) -> anyhow::Result<()> {
-    let x = 0;
+    // TODO fix justification
+    let mut x = 0; // Gets bumped up once per char
     for c in text.as_bytes() {
         // For each line, copy the bytes into our text array
         let jumbo_bytes = get_jumbo_character(*c)?;
+        // Typically all lines will be the same length, but just be safe
+        let x_len = jumbo_bytes
+            .iter()
+            .map(|line| line.len())
+            .max()
+            .unwrap_or_default();
         for y in 0..3 {
             let jumbo_bytes_line = jumbo_bytes[y];
             line_buffer[y][x..x + jumbo_bytes_line.len()]
                 .copy_from_slice(jumbo_bytes_line);
         }
+        // Adjust for this char's width, plus a space
+        x += x_len + 1;
     }
     Ok(())
 }
@@ -475,17 +500,8 @@ fn write_jumbo_text(
 /// Get the bytes for a single jumbo character. Each character is exactly 3
 /// bytes tall, but they have varying widths.
 fn get_jumbo_character(character: u8) -> anyhow::Result<[&'static [u8]; 3]> {
-    // Convenient consts for building up jumbo characters
-    const HBR: u8 = CustomCharacter::HalfBottomRight.tag();
-    const HBL: u8 = CustomCharacter::HalfBottomLeft.tag();
-    const BOT: u8 = CustomCharacter::Bottom.tag();
-    const FBR: u8 = CustomCharacter::FullBottomRight.tag();
-    const FBL: u8 = CustomCharacter::FullBottomLeft.tag();
-    const FUL: u8 = 0xff; // Solid block (built-in to the LCD)
-    const EMT: u8 = b' '; // Empty
-
     // We know how many lines we're modifying, but we *don't* know how many
-    // chars per line we're writing, so those have to be strs
+    // chars per line we're writing, so those have to be slices
     let bytes: [&[u8]; 3] = match character {
         b'0' => [&[HBR, BOT, HBL], &[FUL, EMT, FUL], &[FBR, BOT, FBL]],
         b'1' => [&[BOT, HBL, EMT], &[EMT, FUL, EMT], &[BOT, FUL, BOT]],
@@ -504,4 +520,45 @@ fn get_jumbo_character(character: u8) -> anyhow::Result<[&'static [u8]; 3]> {
         }
     };
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::resource::lcd::{write_jumbo_text, LCD_WIDTH};
+
+    #[test]
+    fn test_jumbo_text() {
+        let mut jumbo = [[b' '; LCD_WIDTH]; 3];
+        write_jumbo_text(&mut jumbo, "10:23").unwrap();
+        assert_eq!(
+            jumbo,
+            [
+                [
+                    BOT, HBL, EMT, EMT, // 1
+                    HBR, BOT, HBL, EMT, // 0
+                    FUL, EMT, // :
+                    HBR, BOT, HBL, EMT, // 2
+                    HBR, BOT, HBL, // 3
+                    EMT, EMT, EMT
+                ],
+                [
+                    EMT, FUL, EMT, EMT, // 1
+                    FUL, EMT, FUL, EMT, // 0
+                    EMT, EMT, // :
+                    HBR, BOT, FBL, EMT, // 2
+                    EMT, BOT, FUL, // 3
+                    EMT, EMT, EMT
+                ],
+                [
+                    BOT, FUL, BOT, EMT, // 1
+                    FBR, BOT, FBL, EMT, // 0
+                    FUL, EMT, // :
+                    FBR, BOT, BOT, EMT, // 2
+                    BOT, BOT, FBL, // 3
+                    EMT, EMT, EMT
+                ]
+            ]
+        );
+    }
 }

@@ -2,7 +2,7 @@
 Description=LCD control webserver
 
 [Service]
-ExecStart=./goldfinger
+ExecStart=/home/pi/goldfinger/goldfinger
 WorkingDirectory=/home/pi/goldfinger
 Environment="ROCKET_PROFILE=release"
 

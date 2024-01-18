@@ -3,7 +3,11 @@
 
 use crate::state::{LcdUserState, UserStateManager};
 use rocket::{
-    form::Form, fs::FileServer, response::Redirect, routes, serde::json::Json,
+    form::Form,
+    fs::FileServer,
+    response::{Debug, Redirect},
+    routes,
+    serde::json::Json,
     Build, Rocket, State,
 };
 use rocket_dyn_templates::Template;
@@ -37,9 +41,9 @@ async fn get_lcd_json(
 async fn set_lcd_json(
     user_state: &State<Arc<UserStateManager>>,
     data: Json<LcdUserState>,
-) -> Json<LcdUserState> {
-    user_state.set(data.into_inner()).await.unwrap(); // TODO remove unwrap
-    Json(*user_state.read().await)
+) -> Result<Json<LcdUserState>, Debug<anyhow::Error>> {
+    user_state.set(data.into_inner()).await?;
+    Ok(Json(*user_state.read().await))
 }
 
 /// Set LCD settings via HTML form
@@ -47,7 +51,7 @@ async fn set_lcd_json(
 async fn set_lcd_form(
     user_state: &State<Arc<UserStateManager>>,
     data: Form<LcdUserState>,
-) -> Redirect {
-    user_state.set(data.into_inner()).await.unwrap(); // TODO remove unwrap
-    Redirect::to("/")
+) -> Result<Redirect, Debug<anyhow::Error>> {
+    user_state.set(data.into_inner()).await?;
+    Ok(Redirect::to("/"))
 }

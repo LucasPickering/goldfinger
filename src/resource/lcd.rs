@@ -440,9 +440,19 @@ fn get_clock_text() -> anyhow::Result<LcdText> {
         })?;
 
     // Next three lines are the time, in jumbo text
-    let time = now.format("%-I:%M").to_string();
-    // This unwrap is safe because the length of lines is fixed
-    write_jumbo_text((&mut text.lines[1..4]).try_into().unwrap(), &time, 1)?;
+    // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+    let time = now.format("%_I:%M").to_string();
+    // Skip the first character to force some left padding
+    let [_, line1, line2, line3] = &mut text.lines;
+    let x_offset = 1;
+    write_jumbo_text(
+        [
+            &mut line1[x_offset..],
+            &mut line2[x_offset..],
+            &mut line3[x_offset..],
+        ],
+        &time,
+    )?;
 
     Ok(text)
 }
@@ -450,11 +460,10 @@ fn get_clock_text() -> anyhow::Result<LcdText> {
 /// Render a string as jumbo text. Jumbo characters are 3 lines tall, so we
 /// need a 3-line slice.
 fn write_jumbo_text(
-    line_buffer: &mut [[u8; LCD_WIDTH]; 3],
+    line_buffer: [&mut [u8]; 3],
     text: &str,
-    x_offset: usize,
 ) -> anyhow::Result<()> {
-    let mut x = x_offset; // Gets bumped up once per char
+    let mut x = 0; // Gets bumped up once per char
     for c in text.as_bytes() {
         // For each line, copy the bytes into our text array
         let jumbo_bytes = get_jumbo_character(*c)?;
@@ -508,7 +517,8 @@ mod tests {
     #[test]
     fn test_jumbo_text() {
         let mut jumbo = [[b' '; LCD_WIDTH]; 3];
-        write_jumbo_text(&mut jumbo, "10:23", 0).unwrap();
+        let [line0, line1, line2] = &mut jumbo;
+        write_jumbo_text([line0, line1, line2], "10:23").unwrap();
         assert_eq!(
             jumbo,
             [

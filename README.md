@@ -42,7 +42,14 @@ Specified pin numbers use the **hardware** pin numbering system.
 - `brew install socat`
 - `brew install arm-linux-gnueabihf-binutils` (for deployment only)
 
-TODO add instructions on using socat
+To run this locally, you need to run a mock serial port in a separate window _before_ starting the server. This gives the LCD handler something to connect to.
+
+```sh
+# In terminal 1
+./mock_serial.sh
+# In terminal 2
+cargo run
+```
 
 ### Deployment
 

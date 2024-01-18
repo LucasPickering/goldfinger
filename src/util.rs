@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use rocket::form::{FromFormField, ValueField};
+use rocket::form::{self, FromFormField, ValueField};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, str::FromStr};
 
@@ -94,7 +94,15 @@ impl From<Color> for String {
 
 impl<'a> FromFormField<'a> for Color {
     fn from_value(field: ValueField<'a>) -> rocket::form::Result<'a, Self> {
-        field.value.parse().map_err(|_error| todo!())
+        let value = field.value;
+        if value.len() == 7 && value.starts_with('#') {
+            let value = u32::from_str_radix(&value[1..], 16)?;
+            Ok(value.into())
+        } else {
+            Err(form::Error::validation(format!(
+                "Invalid color string: {value}"
+            )))?
+        }
     }
 }
 

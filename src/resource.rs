@@ -3,10 +3,10 @@
 
 pub mod lcd;
 
+use crate::state::{LcdUserState, UserStateManager};
 use log::{error, info};
-use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
-use tokio::{sync::RwLock, task::JoinHandle, time};
+use tokio::{task::JoinHandle, time};
 
 /// A hardware resource (e.g. LCD). This captures all generic logic for a
 /// resource, including how to calculate and communicate hardware state. The
@@ -17,22 +17,15 @@ use tokio::{sync::RwLock, task::JoinHandle, time};
 /// fixed interval.
 ///
 /// This is overkill when we only have the LCD, but I copied it from Söze just
-/// in case we need a second.
+/// in case we need a second. It's only half-abstracted though so you'll need
+/// to factor out some stuff around user state to add another resource type.
 pub trait Resource: 'static + Send + Sized {
     const INTERVAL: Duration = Duration::from_millis(100);
-
-    /// Type of state managed by the user/API
-    type UserState: 'static
-        + Clone
-        + Send
-        + Sync
-        + Serialize
-        + Deserialize<'static>;
 
     /// Run a loop that will update hardware on a regular interva.
     fn spawn_task(
         mut self,
-        user_state: Arc<RwLock<Self::UserState>>,
+        user_state: Arc<UserStateManager>,
     ) -> JoinHandle<()> {
         info!("Starting resource {}", self.name());
         tokio::spawn(async move {
@@ -68,5 +61,5 @@ pub trait Resource: 'static + Send + Sized {
 
     /// Update hardware state on a fixed interval, based on the current user
     /// state. This call will hold a lock to the user state, so make it fast!
-    fn on_tick(&mut self, user_state: &Self::UserState) -> anyhow::Result<()>;
+    fn on_tick(&mut self, user_state: &LcdUserState) -> anyhow::Result<()>;
 }

@@ -1,9 +1,12 @@
-use crate::{resource::Resource, util::Color};
+use crate::{
+    resource::Resource,
+    state::{LcdMode, LcdUserState},
+    util::Color,
+};
 use anyhow::{anyhow, bail, Context};
 use chrono::Local;
 use log::{info, trace};
-use rocket::{FromForm, FromFormField};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serialport::SerialPort;
 use std::io::Write;
 
@@ -28,13 +31,6 @@ pub struct Lcd {
     serial: LcdSerialPort,
 }
 
-/// User-facing LCD state
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, FromForm)]
-pub struct LcdUserState {
-    pub mode: LcdMode,
-    pub color: Color,
-}
-
 /// Serial port config, to be loaded from Rocket config
 #[derive(Deserialize)]
 pub struct LcdConfig {
@@ -44,29 +40,13 @@ pub struct LcdConfig {
     port: String,
 }
 
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    Default,
-    Eq,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    FromFormField,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum LcdMode {
-    Off,
-    #[default] // TODO move back
-    Clock,
-}
-
 impl Lcd {
     pub fn new(config: &LcdConfig) -> anyhow::Result<Self> {
         let serial = serialport::new(&config.port, config.baud_rate)
             .open()
-            .context(format!("Error connecting to LCD at {}", config.port))?;
+            .with_context(|| {
+                format!("Error connecting to LCD at {}", config.port)
+            })?;
 
         Ok(Self {
             color: Color::default(),
@@ -111,10 +91,10 @@ impl Lcd {
                 let new_byte = text.get(x, y);
 
                 // Save the new byte, then check if it's a diff
-                self.text.set(x, y, new_byte); // TODO move into else?
                 if old_byte == new_byte {
                     finish_group(&mut current_diff_group);
                 } else {
+                    self.text.set(x, y, new_byte);
                     match &mut current_diff_group {
                         // Start a new diff group
                         None => current_diff_group = Some(TextGroup::new(x, y)),
@@ -145,8 +125,6 @@ impl Lcd {
 }
 
 impl Resource for Lcd {
-    type UserState = LcdUserState;
-
     fn name(&self) -> &str {
         "LCD"
     }
@@ -175,7 +153,7 @@ impl Resource for Lcd {
             .command(LcdCommand::LoadCharacterBank { bank: 0 })
     }
 
-    fn on_tick(&mut self, user_state: &Self::UserState) -> anyhow::Result<()> {
+    fn on_tick(&mut self, user_state: &LcdUserState) -> anyhow::Result<()> {
         match user_state.mode {
             LcdMode::Off => {
                 self.serial.command(LcdCommand::BacklightOff)?;
@@ -464,7 +442,7 @@ fn get_clock_text() -> anyhow::Result<LcdText> {
     // Next three lines are the time, in jumbo text
     let time = now.format("%-I:%M").to_string();
     // This unwrap is safe because the length of lines is fixed
-    write_jumbo_text((&mut text.lines[1..4]).try_into().unwrap(), &time)?;
+    write_jumbo_text((&mut text.lines[1..4]).try_into().unwrap(), &time, 1)?;
 
     Ok(text)
 }
@@ -474,9 +452,9 @@ fn get_clock_text() -> anyhow::Result<LcdText> {
 fn write_jumbo_text(
     line_buffer: &mut [[u8; LCD_WIDTH]; 3],
     text: &str,
+    x_offset: usize,
 ) -> anyhow::Result<()> {
-    // TODO fix justification
-    let mut x = 0; // Gets bumped up once per char
+    let mut x = x_offset; // Gets bumped up once per char
     for c in text.as_bytes() {
         // For each line, copy the bytes into our text array
         let jumbo_bytes = get_jumbo_character(*c)?;
@@ -530,7 +508,7 @@ mod tests {
     #[test]
     fn test_jumbo_text() {
         let mut jumbo = [[b' '; LCD_WIDTH]; 3];
-        write_jumbo_text(&mut jumbo, "10:23").unwrap();
+        write_jumbo_text(&mut jumbo, "10:23", 0).unwrap();
         assert_eq!(
             jumbo,
             [

@@ -1,5 +1,7 @@
+mod weather;
+
 use crate::{
-    resource::Resource,
+    resource::{lcd::weather::Weather, Resource},
     state::{LcdMode, LcdUserState},
     util::Color,
 };
@@ -8,7 +10,7 @@ use chrono::Local;
 use log::{info, trace};
 use serde::Deserialize;
 use serialport::SerialPort;
-use std::io::Write;
+use std::{cmp, io::Write};
 
 /// Width of the LCD, in characters
 const LCD_WIDTH: usize = 20;
@@ -28,6 +30,7 @@ const EMT: u8 = b' '; // Empty
 pub struct Lcd {
     color: Color,
     text: LcdText,
+    weather: Weather,
     serial: LcdSerialPort,
 }
 
@@ -51,6 +54,7 @@ impl Lcd {
         Ok(Self {
             color: Color::default(),
             text: LcdText::default(),
+            weather: Weather::default(),
             serial: LcdSerialPort(serial),
         })
     }
@@ -153,7 +157,13 @@ impl Resource for Lcd {
             .command(LcdCommand::LoadCharacterBank { bank: 0 })
     }
 
-    fn on_tick(&mut self, user_state: &LcdUserState) -> anyhow::Result<()> {
+    async fn on_tick(
+        &mut self,
+        user_state: LcdUserState,
+    ) -> anyhow::Result<()> {
+        if !matches!(user_state.mode, LcdMode::Off) {
+            self.set_color(user_state.color)?;
+        }
         match user_state.mode {
             LcdMode::Off => {
                 self.serial.command(LcdCommand::BacklightOff)?;
@@ -162,9 +172,12 @@ impl Resource for Lcd {
                 self.text.clear();
                 self.color = Color::BLACK;
             }
-            LcdMode::Clock => {
-                self.set_color(user_state.color)?;
-                self.set_text(get_clock_text()?)?;
+            LcdMode::Clock => self.set_text(get_clock_text()?)?,
+            // This will make an HTTP request inline, but that should be fine
+            // since tickrate is more of a suggestion. Worst case scenario we
+            // update less than every 100ms which is fine
+            LcdMode::Weather => {
+                self.set_text(self.weather.forecast().await?)?
             }
         }
         Ok(())
@@ -240,6 +253,30 @@ impl Default for LcdText {
             // Default to whitespace
             lines: [[b' '; LCD_WIDTH]; LCD_HEIGHT],
         }
+    }
+}
+
+impl<T: AsRef<str>> From<[T; LCD_HEIGHT]> for LcdText {
+    fn from(lines: [T; LCD_HEIGHT]) -> Self {
+        let mut text = Self::default();
+        // Copy the first h lines
+        for (y, src_line) in lines.iter().enumerate() {
+            let src_bytes = src_line.as_ref().as_bytes();
+            // Copy the first w bytes
+            let len = cmp::min(src_bytes.len(), LCD_WIDTH);
+            text.lines[y][..len].copy_from_slice(&src_bytes[..len]);
+        }
+        text
+    }
+}
+
+impl From<&str> for LcdText {
+    fn from(s: &str) -> Self {
+        let mut lines = [""; LCD_HEIGHT];
+        for (y, src_line) in s.lines().take(LCD_HEIGHT).enumerate() {
+            lines[y] = src_line;
+        }
+        lines.into()
     }
 }
 

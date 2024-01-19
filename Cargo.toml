@@ -9,6 +9,7 @@ anyhow = "1.0.72"
 chrono = {version = "0.4.31", default-features = false, features = ["clock"]}
 env_logger = "0.10.1"
 log = "0.4.20"
+reqwest = {version = "0.11.23", default-features = false, features = ["json", "rustls-tls"]}
 rocket = {version = "0.5.0", features = ["json"]}
 rocket_dyn_templates = {version = "0.1.0", default-features = false, features = ["tera"]}
 serde = {version = "1.0.195", features = ["derive"]}

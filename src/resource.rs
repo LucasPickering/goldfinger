@@ -5,7 +5,7 @@ pub mod lcd;
 
 use crate::state::{LcdUserState, UserStateManager};
 use log::{error, info};
-use std::{sync::Arc, time::Duration};
+use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{task::JoinHandle, time};
 
 /// A hardware resource (e.g. LCD). This captures all generic logic for a
@@ -30,24 +30,18 @@ pub trait Resource: 'static + Send + Sized {
         info!("Starting resource {}", self.name());
         tokio::spawn(async move {
             // Shitty try block
-            let result: anyhow::Result<()> = async {
+            let _result: anyhow::Result<()> = async {
                 let mut interval = time::interval(Self::INTERVAL);
-                self.on_start()?;
+                self.on_start()?; // TODO do something with result
                 loop {
-                    // Technically we're grabbing this read lock for longer than
-                    // we may need it. The alternative is to
-                    // pass the RwLock down, which would
-                    // make it possible to modify user
-                    // state, which is ugly. The call should
-                    // be fast enough that it's not an issue.
-                    self.on_tick(&*user_state.read().await)?;
+                    let result = self.on_tick(*user_state.read().await).await;
+                    if let Err(err) = result {
+                        error!("Resource {} failed with {}", self.name(), err);
+                    }
                     interval.tick().await;
                 }
             }
             .await;
-            if let Err(err) = result {
-                error!("Resource {} failed with {}", self.name(), err);
-            }
         })
     }
 
@@ -60,6 +54,9 @@ pub trait Resource: 'static + Send + Sized {
     }
 
     /// Update hardware state on a fixed interval, based on the current user
-    /// state. This call will hold a lock to the user state, so make it fast!
-    fn on_tick(&mut self, user_state: &LcdUserState) -> anyhow::Result<()>;
+    /// state
+    fn on_tick(
+        &mut self,
+        user_state: LcdUserState,
+    ) -> impl Future<Output = anyhow::Result<()>> + Send;
 }

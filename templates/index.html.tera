@@ -3,9 +3,9 @@
   <head>
     <title>Goldfinger</title>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/static/favicon.png">
-    <link rel="stylesheet" href="/static/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/static/favicon.png" />
+    <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <div id="root">
@@ -16,8 +16,11 @@
 
         <label for="lcd-mode">Mode</label>
         <select id="lcd-mode" name="mode">
-          <option value="off" selected="{{ mode == "off" }}">Off</option>
-          <option value="clock" selected="{{ mode == "clock" }}">Clock</option>
+          <option value="off" {% if mode == 'off' %}selected{% endif %}>Off</option>
+          <option value="clock" {% if mode == 'clock' %}selected{% endif %}>Clock</option>
+          <option value="weather" {% if mode == 'weather' %}selected{% endif %}>
+            Weather
+          </option>
         </select>
 
         <label for="lcd-color">Color</label>

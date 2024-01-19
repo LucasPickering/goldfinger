@@ -26,3 +26,9 @@ requests:
         "color": "#ff0000",
         "mode": "clock"
       }
+
+  forecast:
+    <<: *base
+    name: Forecast
+    method: GET
+    url: https://api.weather.gov/gridpoints/BOX/71,90/forecast

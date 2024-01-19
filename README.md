@@ -13,7 +13,8 @@ This can be run off-device without opening a serial port by simply running it wi
 ## Hardware
 
 - [Raspberry Pi Zero W](https://www.raspberrypi.org/products/pi-zero/)
-- [Adafruit RGB Backlight 20x4 Character LCD](https://www.adafruit.com/product/498)
+- [Adafruit RGB Backlight 20x4 Character LCD](https://www.winstar.com.tw/products/character-lcd-display-module/wh2004a.html)
+  - [Datasheet](https://www.digikey.com.mx/htmldatasheets/production/1848324/0/0/1/wh2004a-cfh-jt-specification.html)
 - [Adafruit LCD Backpack](https://www.adafruit.com/product/781)
 
 The RPi is connected to the LCD backpack with a 3-pin connector that carries 5V, GND, and TX. The RPi sends commands and data to the backpack via UART. The UART settings are:
@@ -40,7 +41,8 @@ Specified pin numbers use the **hardware** pin numbering system.
 ### Prerequisites
 
 - `brew install socat`
-- `brew install arm-linux-gnueabihf-binutils` (for deployment only)
+- `brew install filosottile/musl-cross/musl-cross --build-from-source --without-x86_64 --without-aarch64 --with-arm-hf` (for deployment only)
+  - https://github.com/FiloSottile/homebrew-musl-cross
 
 To run this locally, you need to run a mock serial port in a separate window _before_ starting the server. This gives the LCD handler something to connect to.
 

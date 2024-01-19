@@ -72,4 +72,5 @@ pub enum LcdMode {
     #[default]
     Off,
     Clock,
+    Weather,
 }

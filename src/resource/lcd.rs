@@ -158,9 +158,9 @@ impl Resource for Lcd {
             LcdMode::Off => {
                 self.serial.command(LcdCommand::BacklightOff)?;
                 self.serial.command(LcdCommand::Clear)?;
-                // Reset internal buffer so we reprint everything when switching
-                // out of this mode
+                // Update internal state to match what we just set
                 self.text.clear();
+                self.color = Color::BLACK;
             }
             LcdMode::Clock => {
                 self.set_color(user_state.color)?;

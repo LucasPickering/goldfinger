@@ -1,25 +1,30 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8" />
     <title>Goldfinger</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <form action="/lcd" method="post">
-      <div>
+    <div id="root">
+      <h1>Goldfinger</h1>
+
+      <form class="resource-form" action="/lcd" method="post">
+        <h2>LCD</h2>
+
+        <label for="lcd-mode">Mode</label>
         <select id="lcd-mode" name="mode">
           <option value="off" selected="{{ mode == "off" }}">Off</option>
           <option value="clock" selected="{{ mode == "clock" }}">Clock</option>
         </select>
-      </div>
 
-      <div>
+        <label for="lcd-color">Color</label>
         <input type="color" id="lcd-color" name="color" value="{{ color }}" />
-        <label for="lcd-color">LCD Color</label>
-      </div>
 
-      <button type="submit">Save</button>
-    </form>
+        <button type="submit">Save</button>
+      </form>
+    </div>
   </body>
 </html>

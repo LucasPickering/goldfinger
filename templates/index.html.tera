@@ -16,15 +16,10 @@
 
         <label for="lcd-mode">Mode</label>
         <select id="lcd-mode" name="mode">
-          <option value="off" {% if mode == 'off' %}selected{% endif %}>Off</option>
           <option value="clock" {% if mode == 'clock' %}selected{% endif %}>Clock</option>
-          <option value="weather" {% if mode == 'weather' %}selected{% endif %}>
             Weather
           </option>
         </select>
-
-        <label for="lcd-color">Color</label>
-        <input type="color" id="lcd-color" name="color" value="{{ color }}" />
 
         <button type="submit">Save</button>
       </form>

@@ -1,16 +1,12 @@
-mod api;
-mod resource;
-mod state;
-mod util;
-
-use crate::{
+use anyhow::Context;
+use goldfinger::{
+    api,
     resource::{
         lcd::{Lcd, LcdConfig},
         Resource,
     },
     state::UserStateManager,
 };
-use anyhow::Context;
 use log::LevelFilter;
 use rocket_dyn_templates::Template;
 use std::sync::Arc;
@@ -33,10 +29,12 @@ async fn main() -> anyhow::Result<()> {
 
     // Spawn a background task to monitor/update hardware
     let lcd = Lcd::new(&lcd_config)?;
-    lcd.spawn_task(user_state);
+    let join_handle = lcd.spawn_task(user_state);
 
     // Primary task will run the API
     rocket.launch().await.context("Error starting API")?;
+
+    join_handle.abort();
 
     Ok(())
 }

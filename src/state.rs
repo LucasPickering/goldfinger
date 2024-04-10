@@ -1,4 +1,3 @@
-use crate::util::Color;
 use anyhow::Context;
 use log::{error, info};
 use rocket::{FromForm, FromFormField};
@@ -53,7 +52,6 @@ impl UserStateManager {
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, FromForm)]
 pub struct LcdUserState {
     pub mode: LcdMode,
-    pub color: Color,
 }
 
 #[derive(
@@ -70,7 +68,5 @@ pub struct LcdUserState {
 #[serde(rename_all = "snake_case")]
 pub enum LcdMode {
     #[default]
-    Off,
-    Clock,
     Weather,
 }

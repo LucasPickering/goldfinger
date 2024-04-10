@@ -5,7 +5,7 @@ pub mod lcd;
 
 use crate::state::{LcdUserState, UserStateManager};
 use log::{error, info};
-use std::{future::Future, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{task::JoinHandle, time};
 
 /// A hardware resource (e.g. LCD). This captures all generic logic for a
@@ -32,9 +32,9 @@ pub trait Resource: 'static + Send + Sized {
             // Shitty try block
             let _result: anyhow::Result<()> = async {
                 let mut interval = time::interval(Self::INTERVAL);
-                self.on_start()?; // TODO do something with result
+                self.on_start()?;
                 loop {
-                    let result = self.on_tick(*user_state.read().await).await;
+                    let result = self.on_tick(*user_state.read().await);
                     if let Err(err) = result {
                         error!("Resource {} failed with {}", self.name(), err);
                     }
@@ -55,8 +55,5 @@ pub trait Resource: 'static + Send + Sized {
 
     /// Update hardware state on a fixed interval, based on the current user
     /// state
-    fn on_tick(
-        &mut self,
-        user_state: LcdUserState,
-    ) -> impl Future<Output = anyhow::Result<()>> + Send;
+    fn on_tick(&mut self, user_state: LcdUserState) -> anyhow::Result<()>;
 }

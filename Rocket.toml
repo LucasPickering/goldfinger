@@ -1,14 +1,8 @@
 [default]
 address = "127.0.0.1"
-# Baud rate 0 required for talking to a virtual serial port on Mac
-# https://github.com/serialport/serialport-rs/issues/22
-lcd_baud_rate = 0
-# See README for instructions on setting this up
-lcd_port = "/tmp/goldfinger_tty"
 port = 8000
 
 [release]
 address = "0.0.0.0"
-lcd_baud_rate = 9600
-lcd_port = "/dev/ttyAMA0"
+lcd_port = "/dev/spidev0.0"
 port = 80

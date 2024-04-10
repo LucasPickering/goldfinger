@@ -1,18 +1,29 @@
 [package]
-description = "API and control system for a Raspberry Pi with character LCD"
+description = "Control system for a Raspberry Pi with e-ink display"
 edition = "2021"
 name = "goldfinger"
 version = "0.1.0"
 
+[lib]
+name = "goldfinger"
+path = "src/lib.rs"
+
+[[bin]]
+name = "goldfinger"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.72"
 chrono = {version = "0.4.31", default-features = false, features = ["clock"]}
+embedded-graphics = "0.6.2"
+embedded-hal = {version = "0.2.3", features = ["unproven"]}
 env_logger = "0.10.1"
+linux-embedded-hal = "0.3.0"
 log = "0.4.20"
 reqwest = {version = "0.11.23", default-features = false, features = ["json", "rustls-tls"]}
 rocket = {version = "0.5.0", features = ["json"]}
 rocket_dyn_templates = {version = "0.1.0", default-features = false, features = ["tera"]}
 serde = {version = "1.0.195", features = ["derive"]}
 serde_json = {version = "1.0.111", default-features = false}
-serialport = {version = "4.3.0", default-features = false}
+ssd1680 = "0.1.0"
 tokio = {version = "1.35.1", default-features = false, features = ["full"]}

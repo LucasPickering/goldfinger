@@ -1,10 +1,9 @@
 [Unit]
-Description=LCD control webserver
+Description=E-ink display control
 
 [Service]
 ExecStart=/home/pi/goldfinger/goldfinger
 WorkingDirectory=/home/pi/goldfinger
-Environment="ROCKET_PROFILE=release"
 
 [Install]
 WantedBy=multi-user.target

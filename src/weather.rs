@@ -1,21 +1,18 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use log::{error, info, warn};
-use reqwest::{Client, ClientBuilder};
 use serde::Deserialize;
 use std::{
-    fmt::{self, Display, Formatter},
-    sync::Arc,
+    sync::{Arc, RwLock},
+    thread,
     time::{Duration, Instant},
 };
-use tokio::{sync::RwLock, task};
 
 const FORECAST_URL: &str =
     "https://api.weather.gov/gridpoints/BOX/71,90/forecast";
 
 /// Gotta know weather or not it's gonna rain
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Weather {
-    client: Client,
     forecast: Arc<RwLock<Option<(Forecast, Instant)>>>,
 }
 
@@ -48,49 +45,30 @@ impl Weather {
 
     /// Spawn a task to fetch the latest forecase in the background
     fn fetch_latest(&self) {
-        let client = self.client.clone();
         let lock = Arc::clone(&self.forecast);
-        task::spawn(async move {
+        thread::spawn(move || {
             // Shitty try block
-            let result: anyhow::Result<Forecast> = async move {
+            let result: anyhow::Result<()> = (|| {
                 info!("Fetching new forecast");
-                let response = client
-                    .get(FORECAST_URL)
-                    .send()
-                    .await
-                    .with_context(|| {
+                let response =
+                    ureq::get(FORECAST_URL).call().with_context(|| {
                         format!("Error fetching forecast from {FORECAST_URL}")
                     })?;
-                response
-                    .json()
-                    .await
-                    .context("Error parsing forecast as JSON")
-            }
-            .await;
+                let forecast: Forecast = response
+                    .into_json()
+                    .context("Error parsing forecast as JSON")?;
+                info!("Saving forecast");
+                let now = Instant::now();
+                // Stringify the error to dump the lifetime
+                *lock.write().map_err(|err| anyhow!("{err}"))? =
+                    Some((forecast, now));
+                Ok(())
+            })();
 
-            match result {
-                Ok(forecast) => {
-                    info!("Saving forecast");
-                    let now = Instant::now();
-                    *lock.write().await = Some((forecast, now));
-                }
-                Err(err) => {
-                    error!("Error fetching forecast: {err:?}")
-                }
+            if let Err(err) = result {
+                error!("Error fetching forecast: {err:?}")
             }
         });
-    }
-}
-
-impl Default for Weather {
-    fn default() -> Self {
-        Self {
-            client: ClientBuilder::new()
-                .user_agent("goldfinger")
-                .build()
-                .unwrap(),
-            forecast: Default::default(),
-        }
     }
 }
 
@@ -121,16 +99,9 @@ pub struct Unit {
     pub value: Option<i32>,
 }
 
-impl Display for ForecastPeriod {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "{:} {}\u{272} {}%",
-            self.name,
-            self.temperature,
-            self.probability_of_precipitation.value.unwrap_or_default(),
-        )?;
-        write!(f, "{}", self.short_forecast)?;
-        Ok(())
+impl ForecastPeriod {
+    /// Percentage chance of precipitation
+    pub fn precipitation(&self) -> i32 {
+        self.probability_of_precipitation.value.unwrap_or_default()
     }
 }

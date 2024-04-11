@@ -1,9 +1,4 @@
-mod weather;
-
-use crate::{
-    resource::{lcd::weather::Weather, Resource},
-    state::LcdUserState,
-};
+use crate::{config::Config, state::UserState, weather::Weather};
 use anyhow::Context;
 use chrono::Local;
 use embedded_graphics::{
@@ -17,12 +12,11 @@ use linux_embedded_hal::{
     sysfs_gpio::Direction,
     Delay, Pin, Spidev,
 };
-use log::{info, trace};
-use serde::Deserialize;
+use log::{debug, info, trace};
 use ssd1680::{
     color::{Black, White},
     driver::Ssd1680,
-    graphics::{Display, Display2in13, DisplayRotation},
+    graphics::{Display as _, Display2in13, DisplayRotation},
 };
 use std::time::Duration;
 
@@ -31,8 +25,8 @@ const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
 const PIN_DC: u64 = 22; // GPIO/BCM 22, pin 15
 const PIN_RESET: u64 = 27; // GPIO/BCM 27, pin 13
 
-/// LCD resource, to manage state calculation and hardware communication
-pub struct Lcd {
+/// Manage state calculation and hardware communication
+pub struct Display {
     // Hardware state
     spi: Spidev,
     controller: Ssd1680<Spidev, Pin, Pin, Pin, Pin>,
@@ -44,16 +38,12 @@ pub struct Lcd {
     weather: Weather,
 }
 
-/// Serial port config, to be loaded from Rocket config
-#[derive(Deserialize)]
-pub struct LcdConfig {
-    #[serde(rename = "lcd_port")]
-    pub port: String,
-}
+impl Display {
+    pub const INTERVAL: Duration = Duration::from_millis(1000);
 
-impl Lcd {
-    pub fn new(config: &LcdConfig) -> anyhow::Result<Self> {
-        let mut spi = Spidev::open(&config.port).context("SPI device")?;
+    pub fn new(config: &Config) -> anyhow::Result<Self> {
+        let mut spi =
+            Spidev::open(&config.display_port).context("SPI device")?;
         let options = SpidevOptions::new()
             .bits_per_word(8)
             .max_speed_hz(1_000_000)
@@ -68,15 +58,74 @@ impl Lcd {
 
         let controller =
             Ssd1680::new(&mut spi, cs, busy, dc, reset, &mut Delay)?;
-        info!("LCD controller initialized");
+        info!("Display controller initialized");
+
+        let mut display = Display2in13::bw();
+        display.set_rotation(DisplayRotation::Rotate90);
 
         Ok(Self {
             spi,
             controller,
-            display: Display2in13::bw(),
+            display,
             text_buffer: Vec::new(),
             weather: Weather::default(),
         })
+    }
+
+    pub fn tick(&mut self, state: &UserState) -> anyhow::Result<()> {
+        debug!("Updating display");
+
+        let mut text_buffer = Vec::new();
+
+        // Clock
+        // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+        let now = Local::now();
+        add_text(
+            &mut text_buffer,
+            now.format("%_I:%M").to_string(),
+            (132, 0),
+            FontSize::Large,
+        );
+
+        // Weather
+        if let Some(forecast) = self.weather.forecast() {
+            let periods = &forecast.properties.periods;
+            let period = if state.weather_period < periods.len() {
+                &periods[state.weather_period]
+            } else {
+                &periods[0]
+            };
+
+            add_text(
+                &mut text_buffer,
+                format!("{}°", period.temperature),
+                (0, 0),
+                FontSize::Large,
+            );
+
+            add_text(
+                &mut text_buffer,
+                format!(
+                    "{}\n{}, {}%",
+                    period.name.clone(),
+                    period.short_forecast,
+                    period.precipitation()
+                ),
+                (0, 36),
+                FontSize::Medium,
+            );
+        }
+
+        // If anything changed, update the screen
+        if self.draw_text(text_buffer)? {
+            trace!("Sending frame to display");
+            self.controller
+                .update_bw_frame(&mut self.spi, self.display.buffer())?;
+            trace!("Updating display");
+            self.controller.display_frame(&mut self.spi, &mut Delay)?;
+            trace!("Done updating display");
+        }
+        Ok(())
     }
 
     /// If text has changed, flush all text from the buffer and write to the
@@ -128,86 +177,6 @@ impl Lcd {
     }
 }
 
-impl Resource for Lcd {
-    const INTERVAL: Duration = Duration::from_millis(1000);
-
-    fn name(&self) -> &str {
-        "LCD"
-    }
-
-    fn on_start(&mut self) -> anyhow::Result<()> {
-        self.display.set_rotation(DisplayRotation::Rotate90);
-        Ok(())
-    }
-
-    fn on_tick(&mut self, _: LcdUserState) -> anyhow::Result<()> {
-        let mut text_buffer = Vec::new();
-
-        // Clock
-        // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
-        let now = Local::now();
-        add_text(
-            &mut text_buffer,
-            now.format("%-I:%M").to_string(),
-            0,
-            0,
-            FontSize::Large,
-        );
-
-        // Weather
-        if let Some(forecast) = self.weather.forecast() {
-            let mut y = 36;
-            for period in &forecast.properties.periods[0..2] {
-                add_text(
-                    &mut text_buffer,
-                    period.name.clone(),
-                    0,
-                    y,
-                    FontSize::Small,
-                );
-                y += 8;
-
-                add_text(
-                    &mut text_buffer,
-                    format!(
-                        "{}\u{272} {}%\n{}",
-                        period.temperature,
-                        period
-                            .probability_of_precipitation
-                            .value
-                            .unwrap_or_default(),
-                        period.short_forecast,
-                    ),
-                    0,
-                    y,
-                    FontSize::Medium,
-                );
-                y += 32;
-                // Padding
-                y += 4;
-            }
-        }
-
-        // If anything changed, update the screen
-        if self.draw_text(text_buffer)? {
-            trace!("Sending frame to display");
-            self.controller
-                .update_bw_frame(&mut self.spi, self.display.buffer())?;
-            trace!("Updating display");
-            self.controller.display_frame(&mut self.spi, &mut Delay)?;
-            trace!("Done updating display");
-        }
-        Ok(())
-    }
-}
-
-/// Blanket Drop impls aren't possible so we need this on the implementor :(
-impl Drop for Lcd {
-    fn drop(&mut self) {
-        info!("Closing resource {}", self.name());
-    }
-}
-
 /// Proxy for font sizes, because the ones from embedded_graphics aren't
 /// object-safe
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -240,8 +209,7 @@ fn init_pin(pin_num: u64, direction: Direction) -> anyhow::Result<Pin> {
 fn add_text(
     buffer: &mut Vec<TextItem>,
     text: String,
-    x: i32,
-    y: i32,
+    (x, y): (i32, i32),
     font_size: FontSize,
 ) {
     buffer.push(TextItem {

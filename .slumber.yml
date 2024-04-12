@@ -1,0 +1,30 @@
+profiles:
+  default:
+    data:
+      host: https://api.openweathermap.org
+      lat: "42.3576187"
+      lon: "-71.0604589"
+
+chains:
+  token:
+    source: !file
+      path: ./openweather_token.txt
+    sensitive: true
+
+base: &base
+  query:
+    lat: "{{lat}}"
+    lon: "{{lon}}"
+    units: imperial
+    appid: "{{chains.token}}"
+
+requests:
+  weather_hourly:
+    <<: *base
+    url: "{{host}}/data/2.5/forecast/hourly"
+    method: GET
+
+  weather_3_hourly:
+    <<: *base
+    url: "{{host}}/data/2.5/forecast"
+    method: GET

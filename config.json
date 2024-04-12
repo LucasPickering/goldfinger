@@ -1,3 +1,8 @@
 {
-  "display_port": "/dev/spidev0.0"
+  "display_port": "/dev/spidev0.0",
+  "weather_location": [
+    42.3576187,
+    -71.0604589
+  ],
+  "openweather_token_file": "./openweather_token.txt"
 }

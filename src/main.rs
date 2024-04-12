@@ -16,7 +16,8 @@ use std::{
 
 fn main() -> anyhow::Result<()> {
     env_logger::builder()
-        .filter_level(LevelFilter::Debug)
+        .filter_level(LevelFilter::Info)
+        .filter_module(env!("CARGO_PKG_NAME"), LevelFilter::Debug)
         .parse_default_env()
         .init();
 

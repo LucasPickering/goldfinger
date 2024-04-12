@@ -6,7 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 anyhow = "1.0.72"
-chrono = {version = "0.4.31", default-features = false, features = ["clock"]}
+chrono = {version = "0.4.31", default-features = false, features = ["clock", "serde"]}
 ctrlc = "3.4.4"
 embedded-graphics = "0.6.2"
 embedded-hal = {version = "0.2.3", features = ["unproven"]}

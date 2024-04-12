@@ -1,4 +1,8 @@
-use crate::{config::Config, state::UserState, weather::Weather};
+use crate::{
+    config::Config,
+    state::{Mode, UserState},
+    weather::Weather,
+};
 use anyhow::Context;
 use chrono::Local;
 use embedded_graphics::{
@@ -12,13 +16,13 @@ use linux_embedded_hal::{
     sysfs_gpio::Direction,
     Delay, Pin, Spidev,
 };
-use log::{debug, info, trace};
+use log::{info, trace};
 use ssd1680::{
     color::{Black, White},
     driver::Ssd1680,
     graphics::{Display as _, Display2in13, DisplayRotation},
 };
-use std::time::Duration;
+use std::{i32, mem, time::Duration};
 
 const PIN_CS: u64 = 8; // GPIO/BCM 8, pin 24
 const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
@@ -35,11 +39,16 @@ pub struct Display {
     // Logical state
     /// The text currently on the screen
     text_buffer: Vec<TextItem>,
+    /// The text to be written to the screen soon™. Empty except during a write
+    /// tick
+    next_text_buffer: Vec<TextItem>,
     weather: Weather,
 }
 
 impl Display {
     pub const INTERVAL: Duration = Duration::from_millis(1000);
+    /// Number of weather periods we can show at once
+    const WEATHER_PERIODS: usize = 4;
 
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =
@@ -63,61 +72,27 @@ impl Display {
         let mut display = Display2in13::bw();
         display.set_rotation(DisplayRotation::Rotate90);
 
+        let weather = Weather::new(config)?;
+
         Ok(Self {
             spi,
             controller,
             display,
             text_buffer: Vec::new(),
-            weather: Weather::default(),
+            next_text_buffer: Vec::new(),
+            weather,
         })
     }
 
     pub fn tick(&mut self, state: &UserState) -> anyhow::Result<()> {
-        debug!("Updating display");
+        trace!("Running display tick");
 
-        let mut text_buffer = Vec::new();
-
-        // Clock
-        // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
-        let now = Local::now();
-        add_text(
-            &mut text_buffer,
-            now.format("%_I:%M").to_string(),
-            (132, 0),
-            FontSize::Large,
-        );
-
-        // Weather
-        if let Some(forecast) = self.weather.forecast() {
-            let periods = &forecast.properties.periods;
-            let period = if state.weather_period < periods.len() {
-                &periods[state.weather_period]
-            } else {
-                &periods[0]
-            };
-
-            add_text(
-                &mut text_buffer,
-                format!("{}°", period.temperature),
-                (0, 0),
-                FontSize::Large,
-            );
-
-            add_text(
-                &mut text_buffer,
-                format!(
-                    "{}\n{}, {}%",
-                    period.name.clone(),
-                    period.short_forecast,
-                    period.precipitation()
-                ),
-                (0, 36),
-                FontSize::Medium,
-            );
+        match state.mode {
+            Mode::Weather => self.draw_weather(state),
         }
 
         // If anything changed, update the screen
-        if self.draw_text(text_buffer)? {
+        if self.draw_text()? {
             trace!("Sending frame to display");
             self.controller
                 .update_bw_frame(&mut self.spi, self.display.buffer())?;
@@ -128,17 +103,87 @@ impl Display {
         Ok(())
     }
 
+    /// Draw screen contents for weather mode
+    fn draw_weather(&mut self, state: &UserState) {
+        // Clock
+        // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+        let now = Local::now();
+        self.add_text(
+            now.format("%_I:%M").to_string(),
+            (132, 0),
+            FontSize::Large,
+        );
+
+        // Weather
+        if let Some(forecast) = self.weather.forecast() {
+            // Now
+            let mut y = 0;
+            let now = &forecast.list[0];
+            y += self.add_text(now.temperature(), (0, y), FontSize::Large).1;
+            y += self
+                .add_text(
+                    format!("{}, {}", now.prob_of_precip(), now.weather()),
+                    (0, y),
+                    FontSize::Medium,
+                )
+                .1;
+            y += 12;
+
+            for period in forecast
+                .periods()
+                // Always skip the first period because we showed that above
+                .skip(state.weather_period + 1)
+                .take(Self::WEATHER_PERIODS)
+            {
+                y += self
+                    .add_text(
+                        format!(
+                            "{} {} {}, {}",
+                            period.time().format("%_I%P"),
+                            period.temperature(),
+                            period.prob_of_precip(),
+                            period.weather(),
+                        ),
+                        (0, y),
+                        FontSize::Medium,
+                    )
+                    .1;
+            }
+        }
+    }
+
+    /// Add text to the buffer, to be written later. Return the dimensions of
+    /// the text
+    fn add_text(
+        &mut self,
+        text: String,
+        (x, y): (i32, i32),
+        font_size: FontSize,
+    ) -> (i32, i32) {
+        let (char_width, char_height) = font_size.char_dimensions();
+        let width =
+            text.lines().map(str::len).max().unwrap() as i32 * char_width;
+        let height = text.lines().count() as i32 * char_height;
+
+        self.next_text_buffer.push(TextItem {
+            text,
+            location: Point::new(x, y),
+            font_size,
+        });
+        (width, height)
+    }
+
     /// If text has changed, flush all text from the buffer and write to the
     /// screen. If nothing changed, do nothing. Return whether or not the text
     /// changed.
-    fn draw_text(&mut self, buffer: Vec<TextItem>) -> anyhow::Result<bool> {
-        if buffer != self.text_buffer {
+    fn draw_text(&mut self) -> anyhow::Result<bool> {
+        if self.next_text_buffer != self.text_buffer {
             trace!(
                 "Text changed: old={:?}; new={:?}",
                 self.text_buffer,
-                buffer
+                self.next_text_buffer
             );
-            self.text_buffer = buffer;
+            self.text_buffer = mem::take(&mut self.next_text_buffer);
 
             for text_item in &self.text_buffer {
                 let text = Text::new(&text_item.text, text_item.location);
@@ -172,6 +217,7 @@ impl Display {
 
             Ok(true)
         } else {
+            self.next_text_buffer.clear();
             Ok(false)
         }
     }
@@ -184,6 +230,16 @@ enum FontSize {
     Small,
     Medium,
     Large,
+}
+
+impl FontSize {
+    fn char_dimensions(&self) -> (i32, i32) {
+        match self {
+            FontSize::Small => (6, 8),
+            FontSize::Medium => (12, 16),
+            FontSize::Large => (24, 32),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -203,18 +259,4 @@ fn init_pin(pin_num: u64, direction: Direction) -> anyhow::Result<Pin> {
         pin.set_value(1)?;
     }
     Ok(pin)
-}
-
-/// Add text to the buffer, to be written later
-fn add_text(
-    buffer: &mut Vec<TextItem>,
-    text: String,
-    (x, y): (i32, i32),
-    font_size: FontSize,
-) {
-    buffer.push(TextItem {
-        text,
-        location: Point::new(x, y),
-        font_size,
-    })
 }

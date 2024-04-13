@@ -7,7 +7,7 @@ use anyhow::Context;
 use chrono::Local;
 use embedded_graphics::{
     drawable::Drawable,
-    fonts::{Font12x16, Font24x32, Font6x8, Text},
+    fonts::{Font12x16, Font24x32, Text},
     geometry::Point,
     text_style,
 };
@@ -127,7 +127,7 @@ impl Display {
                     FontSize::Medium,
                 )
                 .1;
-            y += 12;
+            y += 8;
 
             for period in forecast
                 .periods()
@@ -190,13 +190,6 @@ impl Display {
                 match text_item.font_size {
                     // The Font trait isn't object safe so we need static
                     // dispatch here, which is annoying
-                    FontSize::Small => text
-                        .into_styled(text_style!(
-                            font = Font6x8,
-                            text_color = Black,
-                            background_color = White,
-                        ))
-                        .draw(&mut self.display),
                     FontSize::Medium => text
                         .into_styled(text_style!(
                             font = Font12x16,
@@ -227,7 +220,6 @@ impl Display {
 /// object-safe
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum FontSize {
-    Small,
     Medium,
     Large,
 }
@@ -235,7 +227,6 @@ enum FontSize {
 impl FontSize {
     fn char_dimensions(&self) -> (i32, i32) {
         match self {
-            FontSize::Small => (6, 8),
             FontSize::Medium => (12, 16),
             FontSize::Large => (24, 32),
         }

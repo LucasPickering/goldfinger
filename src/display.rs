@@ -18,7 +18,7 @@ use linux_embedded_hal::{
 };
 use log::{info, trace};
 use ssd1680::{
-    color::{Black, White},
+    color::{Black, Color, White},
     driver::Ssd1680,
     graphics::{Display as _, Display2in13, DisplayRotation},
 };
@@ -185,6 +185,7 @@ impl Display {
             );
             self.text_buffer = mem::take(&mut self.next_text_buffer);
 
+            self.display.clear_buffer(Color::Black);
             for text_item in &self.text_buffer {
                 let text = Text::new(&text_item.text, text_item.location);
                 match text_item.font_size {

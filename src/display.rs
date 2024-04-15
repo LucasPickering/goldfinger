@@ -118,11 +118,11 @@ impl Display {
         if let Some(forecast) = self.weather.forecast() {
             // Now
             let mut y = 0;
-            let now = &forecast.list[0];
+            let now = forecast.now();
             y += self.add_text(now.temperature(), (0, y), FontSize::Large).1;
             y += self
                 .add_text(
-                    format!("{}, {}", now.prob_of_precip(), now.weather()),
+                    format!("{} {}", now.prob_of_precip(), now.weather()),
                     (0, y),
                     FontSize::Medium,
                 )
@@ -130,15 +130,14 @@ impl Display {
             y += 8;
 
             for period in forecast
-                .periods()
-                // Always skip the first period because we showed that above
-                .skip(state.weather_period + 1)
+                .future_periods()
+                .skip(state.weather_period)
                 .take(Self::WEATHER_PERIODS)
             {
                 y += self
                     .add_text(
                         format!(
-                            "{} {} {}, {}",
+                            "{} {} {} {}",
                             period.time().format("%_I%P"),
                             period.temperature(),
                             period.prob_of_precip(),

@@ -23,6 +23,10 @@ impl Weather {
     const FORECAST_TTL: Duration = Duration::from_secs(600);
     const API_URL: &'static str =
         "https://api.openweathermap.org/data/2.5/forecast";
+    // Start and end (inclusive) of forecast times that *should* be shown.
+    // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
+    const DAY_START: Option<NaiveTime> = NaiveTime::from_hms_opt(4, 30, 0);
+    const DAY_END: Option<NaiveTime> = NaiveTime::from_hms_opt(22, 30, 0);
 
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let api_key = fs::read_to_string(&config.openweather_token_file)
@@ -138,16 +142,19 @@ pub struct Wind {
 }
 
 impl Forecast {
-    /// Get the list of periods that should be shown. This skips ones in the
-    /// middle of the night
-    pub fn periods(&self) -> impl Iterator<Item = &ForecastPeriod> {
-        let night_start = NaiveTime::from_hms_opt(22, 0, 0).unwrap();
-        let night_end = NaiveTime::from_hms_opt(6, 0, 0).unwrap();
-        self.list.iter().filter(move |period| {
-            // Time is a flat circle, so we can't use Range::contains
-            let time = period.time().time();
-            night_end <= time && time < night_start
-        })
+    /// Get the current forecast period
+    pub fn now(&self) -> &ForecastPeriod {
+        &self.list[0]
+    }
+
+    /// Get the list of *future* periods that should be shown. This skips ones
+    /// in the middle of the night, as well as the current period
+    pub fn future_periods(&self) -> impl Iterator<Item = &ForecastPeriod> {
+        let day_range = Weather::DAY_START.unwrap()..=Weather::DAY_END.unwrap();
+        self.list
+            .iter()
+            .skip(1) // FUUUUUUUUTUUUUUURE
+            .filter(move |period| day_range.contains(&period.time().time()))
     }
 }
 
@@ -164,7 +171,7 @@ impl ForecastPeriod {
 
     /// Formatted probability of precipitation
     pub fn prob_of_precip(&self) -> String {
-        format!("{:.0}%", self.prob_of_precip)
+        format!("{:.0}%", self.prob_of_precip * 100.0)
     }
 
     /// Get the name of the weather for this period, e.g. "clear" or "clouds"

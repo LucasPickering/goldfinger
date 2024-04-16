@@ -4,6 +4,10 @@ Description=E-ink display control
 [Service]
 ExecStart=/home/pi/goldfinger/goldfinger
 WorkingDirectory=/home/pi/goldfinger
+Restart=on-failure
+RestartSec=1s
+RestartMaxDelaySec=30s
+RestartSteps=5
 
 [Install]
 WantedBy=multi-user.target

@@ -4,7 +4,6 @@ use chrono::{DateTime, Local, NaiveTime, Utc};
 use log::{error, info, warn};
 use serde::Deserialize;
 use std::{
-    fs,
     sync::{Arc, RwLock},
     thread,
     time::{Duration, Instant},
@@ -13,34 +12,30 @@ use std::{
 /// Gotta know weather or not it's gonna rain
 #[derive(Debug)]
 pub struct Weather {
-    api_key: String,
-    /// Latitude, longitude
-    location: (f32, f32),
+    url: String,
     forecast: Arc<RwLock<Option<(Forecast, Instant)>>>,
 }
 
 impl Weather {
     const FORECAST_TTL: Duration = Duration::from_secs(600);
-    const API_URL: &'static str =
-        "https://api.openweathermap.org/data/2.5/forecast";
+    const API_HOST: &'static str = "https://api.weather.gov";
     // Start and end (inclusive) of forecast times that *should* be shown.
     // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
     const DAY_START: Option<NaiveTime> = NaiveTime::from_hms_opt(4, 30, 0);
     const DAY_END: Option<NaiveTime> = NaiveTime::from_hms_opt(22, 30, 0);
 
-    pub fn new(config: &Config) -> anyhow::Result<Self> {
-        let api_key = fs::read_to_string(&config.openweather_token_file)
-            .context(format!(
-                "Error reading OpenWeather token from {:?}",
-                config.openweather_token_file,
-            ))?
-            .trim()
-            .to_owned();
-        Ok(Self {
-            api_key,
-            location: config.weather_location,
+    pub fn new(config: &Config) -> Self {
+        let url = format!(
+            "{}/gridpoints/{}/{},{}/forecast/hourly",
+            Self::API_HOST,
+            config.forecast_office,
+            config.forecast_gridpoint.0,
+            config.forecast_gridpoint.1
+        );
+        Self {
+            url,
             forecast: Default::default(),
-        })
+        }
     }
 
     /// Get the latest forecast. If the forecast is missing or outdated, spawn
@@ -70,21 +65,14 @@ impl Weather {
     /// Spawn a task to fetch the latest forecase in the background
     fn fetch_latest(&self) {
         let lock = Arc::clone(&self.forecast);
-        let (lat, lon) = self.location;
-        let request = ureq::get(Self::API_URL).query_pairs([
-            ("lat", lat.to_string().as_str()),
-            ("lon", lon.to_string().as_str()),
-            ("units", "imperial"), // 🇺🇸
-            // Yes this is really how they auth...
-            ("appid", self.api_key.as_str()),
-        ]);
+        let request = ureq::get(&self.url);
 
         thread::spawn(move || {
             // Shitty try block
             let result: anyhow::Result<()> = (|| {
                 info!("Fetching new forecast");
                 let response = request.call().with_context(|| {
-                    format!("Error fetching forecast from {}", Self::API_URL)
+                    format!("Error fetching forecast from {}", Self::API_HOST)
                 })?;
                 let forecast: Forecast = response
                     .into_json()
@@ -104,78 +92,69 @@ impl Weather {
     }
 }
 
-/// https://openweathermap.org/forecast5#fields_JSON
+///https://www.weather.gov/documentation/services-web-api#/default/gridpoint_forecast
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Forecast {
-    pub list: Vec<ForecastPeriod>,
+    properties: ForecastProperties,
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForecastProperties {
+    periods: Vec<ForecastPeriod>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ForecastPeriod {
-    /// Private to force usage of the localized version
-    #[serde(rename = "dt", with = "chrono::serde::ts_seconds")]
-    time: DateTime<Utc>,
-    pub main: ForecastPeriodMain,
-    #[serde(rename = "pop")]
-    pub prob_of_precip: f32,
-    pub weather: Vec<WeatherItem>,
+    start_time: DateTime<Utc>,
+    temperature: i32,
+    probability_of_precipitation: Unit,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct ForecastPeriodMain {
-    #[serde(rename = "temp")]
-    pub temperature: f32,
-    pub feels_like: f32,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct WeatherItem {
-    pub main: String,
-    pub description: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct Wind {
-    pub deg: u32,
-    pub gust: f32,
-    pub speed: f32,
+#[serde(rename_all = "camelCase")]
+pub struct Unit {
+    pub value: Option<i32>,
 }
 
 impl Forecast {
     /// Get the current forecast period
     pub fn now(&self) -> &ForecastPeriod {
-        &self.list[0]
+        &self.properties.periods[0]
     }
 
     /// Get the list of *future* periods that should be shown. This skips ones
     /// in the middle of the night, as well as the current period
     pub fn future_periods(&self) -> impl Iterator<Item = &ForecastPeriod> {
         let day_range = Weather::DAY_START.unwrap()..=Weather::DAY_END.unwrap();
-        self.list
+        self.properties
+            .periods
             .iter()
             .skip(1) // FUUUUUUUUTUUUUUURE
-            .filter(move |period| day_range.contains(&period.time().time()))
+            .filter(move |period| {
+                day_range.contains(&period.start_time().time())
+            })
     }
 }
 
 impl ForecastPeriod {
-    /// Localized timestamp for this period
-    pub fn time(&self) -> DateTime<Local> {
-        self.time.with_timezone(&Local)
+    /// Localized timestamp for the start of this period
+    pub fn start_time(&self) -> DateTime<Local> {
+        self.start_time.with_timezone(&Local)
     }
 
     /// Formatted temperature
     pub fn temperature(&self) -> String {
-        format!("{:.0}°", self.main.temperature)
+        format!("{:.0}°", self.temperature)
     }
 
     /// Formatted probability of precipitation
     pub fn prob_of_precip(&self) -> String {
-        format!("{:.0}%", self.prob_of_precip * 100.0)
-    }
-
-    /// Get the name of the weather for this period, e.g. "clear" or "clouds"
-    pub fn weather(&self) -> &str {
-        &self.weather[0].main
+        format!(
+            "{:.0}%",
+            self.probability_of_precipitation.value.unwrap_or_default()
+        )
     }
 }

@@ -72,7 +72,7 @@ impl Display {
         let mut display = Display2in13::bw();
         display.set_rotation(DisplayRotation::Rotate90);
 
-        let weather = Weather::new(config)?;
+        let weather = Weather::new(config);
 
         Ok(Self {
             spi,
@@ -121,11 +121,7 @@ impl Display {
             let now = forecast.now();
             y += self.add_text(now.temperature(), (0, y), FontSize::Large).1;
             y += self
-                .add_text(
-                    format!("{} {}", now.prob_of_precip(), now.weather()),
-                    (0, y),
-                    FontSize::Medium,
-                )
+                .add_text(now.prob_of_precip(), (0, y), FontSize::Medium)
                 .1;
             y += 8;
 
@@ -137,11 +133,10 @@ impl Display {
                 y += self
                     .add_text(
                         format!(
-                            "{} {} {} {}",
-                            period.time().format("%_I%P"),
+                            "{} {} {}",
+                            period.start_time().format("%_I%P"),
                             period.temperature(),
                             period.prob_of_precip(),
-                            period.weather(),
                         ),
                         (0, y),
                         FontSize::Medium,

@@ -1,14 +1,13 @@
 use anyhow::Context;
 use log::info;
 use serde::Deserialize;
-use std::{fs::File, path::PathBuf};
+use std::fs::File;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub display_port: String,
-    /// Latitude, longitude
-    pub weather_location: (f32, f32),
-    pub openweather_token_file: PathBuf,
+    pub forecast_office: String,
+    pub forecast_gridpoint: (u32, u32),
 }
 
 impl Config {

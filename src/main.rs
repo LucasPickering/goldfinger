@@ -1,4 +1,5 @@
 mod config;
+#[cfg_attr(not(target_arch = "arm"), path = "mock_display.rs")]
 mod display;
 mod state;
 mod weather;

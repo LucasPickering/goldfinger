@@ -11,9 +11,12 @@ ctrlc = "3.4.4"
 embedded-graphics = "0.6.2"
 embedded-hal = {version = "0.2.3", features = ["unproven"]}
 env_logger = "0.10.1"
-linux-embedded-hal = "0.3.0"
+itertools = "0.13.0"
 log = "0.4.20"
 serde = {version = "1.0.195", features = ["derive"]}
 serde_json = {version = "1.0.111", default-features = false}
 ssd1680 = "0.1.0"
 ureq = {version = "2.9.6", features = ["json"]}
+
+[target.'cfg(target_arch = "arm")'.dependencies]
+linux-embedded-hal = "0.3.0"

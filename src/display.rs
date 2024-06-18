@@ -133,8 +133,9 @@ impl Display {
                 y += self
                     .add_text(
                         format!(
-                            "{} {} {}",
+                            "{}-{} {} {}",
                             period.start_time().format("%_I%P"),
+                            period.end_time().format("%-I%P"),
                             period.temperature(),
                             period.prob_of_precip(),
                         ),

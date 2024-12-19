@@ -3,28 +3,29 @@ use crate::{
     state::{Mode, UserState},
     weather::Weather,
 };
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use chrono::Local;
 use embedded_graphics::{
-    drawable::Drawable,
-    fonts::{Font12x16, Font24x32, Text},
     geometry::Point,
-    text_style,
+    mono_font::MonoTextStyle,
+    pixelcolor::BinaryColor,
+    text::{Baseline, Text},
+    Drawable,
 };
+use embedded_vintage_fonts::{FONT_12X16, FONT_24X32};
 use linux_embedded_hal::{
     spidev::{SpiModeFlags, SpidevOptions},
     sysfs_gpio::Direction,
-    Delay, Pin, Spidev,
+    Delay, SpidevDevice, SysfsPin,
 };
 use log::{info, trace};
 use ssd1680::{
-    color::{Black, Color, White},
-    driver::Ssd1680,
+    color::Color,
+    driver::{DisplayError, Ssd1680},
     graphics::{Display as _, Display2in13, DisplayRotation},
 };
-use std::{i32, mem, time::Duration};
+use std::{mem, time::Duration};
 
-const PIN_CS: u64 = 8; // GPIO/BCM 8, pin 24
 const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
 const PIN_DC: u64 = 22; // GPIO/BCM 22, pin 15
 const PIN_RESET: u64 = 27; // GPIO/BCM 27, pin 13
@@ -32,8 +33,7 @@ const PIN_RESET: u64 = 27; // GPIO/BCM 27, pin 13
 /// Manage state calculation and hardware communication
 pub struct Display {
     // Hardware state
-    spi: Spidev,
-    controller: Ssd1680<Spidev, Pin, Pin, Pin, Pin>,
+    controller: Ssd1680<SpidevDevice, SysfsPin, SysfsPin, SysfsPin>,
     display: Display2in13,
 
     // Logical state
@@ -52,7 +52,7 @@ impl Display {
 
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =
-            Spidev::open(&config.display_port).context("SPI device")?;
+            SpidevDevice::open(&config.display_port).context("SPI device")?;
         let options = SpidevOptions::new()
             .bits_per_word(8)
             .max_speed_hz(1_000_000)
@@ -60,13 +60,15 @@ impl Display {
             .build();
         spi.configure(&options).context("SPI configuration")?;
 
-        let cs = init_pin(PIN_CS, Direction::Out).context("Pin CS")?;
-        let reset = init_pin(PIN_RESET, Direction::Out).context("Pin Reset")?;
-        let dc = init_pin(PIN_DC, Direction::Out).context("Pin D/C")?;
-        let busy = init_pin(PIN_BUSY, Direction::In).context("Pin Busy")?;
+        let reset = init_pin(PIN_RESET, Direction::Out)
+            .context("Initializing pin Reset")?;
+        let dc =
+            init_pin(PIN_DC, Direction::Out).context("Initializing pin D/C")?;
+        let busy = init_pin(PIN_BUSY, Direction::In)
+            .context("Initializing pin Busy")?;
 
-        let controller =
-            Ssd1680::new(&mut spi, cs, busy, dc, reset, &mut Delay)?;
+        let controller = Ssd1680::new(spi, busy, dc, reset, &mut Delay)
+            .map_err(map_error)?;
         info!("Display controller initialized");
 
         let mut display = Display2in13::bw();
@@ -75,7 +77,6 @@ impl Display {
         let weather = Weather::new(config);
 
         Ok(Self {
-            spi,
             controller,
             display,
             text_buffer: Vec::new(),
@@ -95,9 +96,12 @@ impl Display {
         if self.draw_text()? {
             trace!("Sending frame to display");
             self.controller
-                .update_bw_frame(&mut self.spi, self.display.buffer())?;
+                .update_bw_frame(self.display.buffer())
+                .map_err(map_error)?;
             trace!("Updating display");
-            self.controller.display_frame(&mut self.spi, &mut Delay)?;
+            self.controller
+                .display_frame(&mut Delay)
+                .map_err(map_error)?;
             trace!("Done updating display");
         }
         Ok(())
@@ -133,9 +137,9 @@ impl Display {
                 y += self
                     .add_text(
                         format!(
-                            "{}-{} {} {}",
+                            "{}-{} {:>4} {:>4}",
                             period.start_time().format("%_I%P"),
-                            period.end_time().format("%-I%P"),
+                            period.end_time().format("%_I%P"),
                             period.temperature(),
                             period.prob_of_precip(),
                         ),
@@ -180,28 +184,24 @@ impl Display {
             );
             self.text_buffer = mem::take(&mut self.next_text_buffer);
 
-            self.display.clear_buffer(Color::Black);
+            self.display.clear_buffer(Color::White);
             for text_item in &self.text_buffer {
-                let text = Text::new(&text_item.text, text_item.location);
-                match text_item.font_size {
-                    // The Font trait isn't object safe so we need static
-                    // dispatch here, which is annoying
-                    FontSize::Medium => text
-                        .into_styled(text_style!(
-                            font = Font12x16,
-                            text_color = Black,
-                            background_color = White,
-                        ))
-                        .draw(&mut self.display),
-                    FontSize::Large => text
-                        .into_styled(text_style!(
-                            font = Font24x32,
-                            text_color = Black,
-                            background_color = White,
-                        ))
-                        .draw(&mut self.display),
-                }
-                .context("Drawing text")?;
+                let style = match text_item.font_size {
+                    FontSize::Medium => {
+                        MonoTextStyle::new(&FONT_12X16, BinaryColor::Off)
+                    }
+                    FontSize::Large => {
+                        MonoTextStyle::new(&FONT_24X32, BinaryColor::Off)
+                    }
+                };
+                Text::with_baseline(
+                    &text_item.text,
+                    text_item.location,
+                    style,
+                    Baseline::Top,
+                )
+                .draw(&mut self.display)
+                .map_err(map_error)?;
             }
 
             Ok(true)
@@ -237,13 +237,20 @@ struct TextItem {
 }
 
 /// Initialize a GPIO pin
-fn init_pin(pin_num: u64, direction: Direction) -> anyhow::Result<Pin> {
-    let pin = Pin::new(pin_num);
-    pin.export()?;
+fn init_pin(pin_num: u64, direction: Direction) -> anyhow::Result<SysfsPin> {
+    let pin = SysfsPin::new(pin_num);
+    pin.export().context("Error exporting pin")?;
     while !pin.is_exported() {}
-    pin.set_direction(direction)?;
+    pin.set_direction(direction)
+        .context("Error setting pin direction")?;
     if matches!(direction, Direction::Out) {
-        pin.set_value(1)?;
+        pin.set_value(1).context("Error enabling pin")?;
     }
     Ok(pin)
+}
+
+/// The error type from the driver doesn't implement Error so we have to map
+/// manually
+fn map_error(error: DisplayError) -> anyhow::Error {
+    anyhow!("{error:?}")
 }

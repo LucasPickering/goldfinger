@@ -23,6 +23,6 @@ else
     ssh $PI_HOST << EOF
         sudo systemctl stop goldfinger
         cd ./goldfinger
-        sudo ./goldfinger
+        RUST_BACKTRACE=1 sudo -E ./goldfinger
 EOF
 fi

@@ -8,15 +8,16 @@ version = "0.1.0"
 anyhow = "1.0.72"
 chrono = {version = "0.4.31", default-features = false, features = ["clock", "serde"]}
 ctrlc = "3.4.4"
-embedded-graphics = "0.6.2"
-embedded-hal = {version = "0.2.3", features = ["unproven"]}
+embedded-graphics = "0.8.1"
+embedded-hal = "1.0.0"
+embedded-vintage-fonts = "0.2.0"
 env_logger = "0.10.1"
 itertools = "0.13.0"
 log = "0.4.20"
 serde = {version = "1.0.195", features = ["derive"]}
 serde_json = {version = "1.0.111", default-features = false}
-ssd1680 = "0.1.0"
+ssd1680 = "0.2.0"
 ureq = {version = "2.9.6", features = ["json"]}
 
 [target.'cfg(target_arch = "arm")'.dependencies]
-linux-embedded-hal = "0.3.0"
+linux-embedded-hal = "0.4.0"

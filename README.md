@@ -22,6 +22,10 @@ I haven't figured out to run this locally, it needs some hardware mocking. Usual
 - `brew install filosottile/musl-cross/musl-cross --build-from-source --without-x86_64 --without-aarch64 --with-arm-hf` (for deployment only)
   - https://github.com/FiloSottile/homebrew-musl-cross
 
+### Pi Setup
+
+From a fresh RPi OS installation, you'll need to enable both **SPI** and **GPIO via network** in `raspi-config`.
+
 ### Deployment
 
 The executable is cross-compiled for the Raspberry Pi, then copied over with a script. Make sure you installed the correct linker in the prerequisites.

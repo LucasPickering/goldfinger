@@ -216,8 +216,6 @@ mod tests {
         }
     }
 
-    // TODO fix tz thing
-
     #[test]
     fn test_now() {
         let forecast = Forecast {

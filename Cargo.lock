@@ -258,15 +258,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embedded-vintage-fonts"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3703d421b4cf1d3b44cbed1daac7cee013c9eeceb4611f01b3d5e2258335699f"
-dependencies = [
- "embedded-graphics",
-]
-
-[[package]]
 name = "env_filter"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -336,13 +327,13 @@ dependencies = [
  "ctrlc",
  "embedded-graphics",
  "embedded-hal",
- "embedded-vintage-fonts",
  "env_logger",
  "linux-embedded-hal",
  "log",
  "serde",
  "serde_json",
  "ssd1680",
+ "u8g2-fonts",
  "ureq",
 ]
 
@@ -973,6 +964,16 @@ checksum = "9117f5d4db391c1cf6927e7bea3db74b9a1c1add8f7eda9ffd5364f40f57b82f"
 dependencies = [
  "displaydoc",
  "zerovec",
+]
+
+[[package]]
+name = "u8g2-fonts"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5cc61ab1af2876aaf5e70d6e8388d660e0a2b5db6a1f8de9312feaa2b6a051a"
+dependencies = [
+ "embedded-graphics",
+ "embedded-graphics-core",
 ]
 
 [[package]]

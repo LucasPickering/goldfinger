@@ -7,7 +7,7 @@ PROJECT_DIR=/home/pi/goldfinger
 PI_TARGET=arm-unknown-linux-musleabihf
 FILES="goldfinger.service config.json target/$PI_TARGET/release/goldfinger"
 
-cargo build -v --release --target $PI_TARGET
+cargo build --release --target $PI_TARGET
 rsync -r -vv $FILES $PI_HOST:$PROJECT_DIR
 
 if [ "$1" = "--release" ]; then
@@ -23,5 +23,5 @@ else
     ssh -t $PI_HOST "
         sudo systemctl stop goldfinger;
         cd ./goldfinger;
-        RUST_BACKTRACE=1 ./goldfinger"
+        RUST_BACKTRACE=1 sudo -E ./goldfinger"
 fi

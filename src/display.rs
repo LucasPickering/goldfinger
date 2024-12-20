@@ -2,12 +2,10 @@ use crate::config::Config;
 use anyhow::{anyhow, Context};
 use embedded_graphics::{
     geometry::Point,
-    mono_font::MonoTextStyle,
     pixelcolor::BinaryColor,
-    text::{Baseline, Text},
+    text::{Alignment, Baseline, Text, TextStyleBuilder},
     Drawable,
 };
-use embedded_vintage_fonts::{FONT_12X16, FONT_24X32};
 use linux_embedded_hal::{
     spidev::{SpiModeFlags, SpidevOptions},
     sysfs_gpio::Direction,
@@ -20,6 +18,7 @@ use ssd1680::{
     graphics::{Display as _, Display2in13, DisplayRotation},
 };
 use std::mem;
+use u8g2_fonts::{fonts, U8g2TextStyle};
 
 const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
 const PIN_DC: u64 = 22; // GPIO/BCM 22, pin 15
@@ -72,25 +71,25 @@ impl Display {
         })
     }
 
-    /// Add text to the buffer, to be written later. Return the dimensions of
-    /// the text
+    /// Add text to the buffer, to be written later. Return the height of the
+    /// text line
     pub fn add_text(
         &mut self,
         text: String,
         (x, y): (i32, i32),
         font_size: FontSize,
-    ) -> (i32, i32) {
-        let (char_width, char_height) = font_size.char_dimensions();
-        let width =
-            text.lines().map(str::len).max().unwrap() as i32 * char_width;
+        alignment: Alignment,
+    ) -> i32 {
+        let char_height = font_size.char_height();
         let height = text.lines().count() as i32 * char_height;
 
         self.next_text_buffer.push(TextItem {
             text,
             location: Point::new(x, y),
             font_size,
+            alignment,
         });
-        (width, height)
+        height
     }
 
     /// Draw current text buffer to the screen, if it's changed
@@ -122,19 +121,16 @@ impl Display {
 
             self.display.clear_buffer(Color::White);
             for text_item in &self.text_buffer {
-                let style = match text_item.font_size {
-                    FontSize::Medium => {
-                        MonoTextStyle::new(&FONT_12X16, BinaryColor::Off)
-                    }
-                    FontSize::Large => {
-                        MonoTextStyle::new(&FONT_24X32, BinaryColor::Off)
-                    }
-                };
-                Text::with_baseline(
+                let character_style = text_item.font_size.font();
+                let text_style = TextStyleBuilder::new()
+                    .baseline(Baseline::Top)
+                    .alignment(text_item.alignment)
+                    .build();
+                Text::with_text_style(
                     &text_item.text,
                     text_item.location,
-                    style,
-                    Baseline::Top,
+                    character_style,
+                    text_style,
                 )
                 .draw(&mut self.display)
                 .map_err(map_error)?;
@@ -156,10 +152,23 @@ pub enum FontSize {
 }
 
 impl FontSize {
-    fn char_dimensions(&self) -> (i32, i32) {
+    fn font(&self) -> U8g2TextStyle<BinaryColor> {
         match self {
-            FontSize::Medium => (12, 16),
-            FontSize::Large => (24, 32),
+            FontSize::Medium => U8g2TextStyle::new(
+                fonts::u8g2_font_spleen12x24_me,
+                BinaryColor::Off,
+            ),
+            FontSize::Large => U8g2TextStyle::new(
+                fonts::u8g2_font_spleen32x64_me,
+                BinaryColor::Off,
+            ),
+        }
+    }
+
+    fn char_height(&self) -> i32 {
+        match self {
+            FontSize::Medium => 19,
+            FontSize::Large => 40,
         }
     }
 }
@@ -169,6 +178,7 @@ struct TextItem {
     text: String,
     location: Point,
     font_size: FontSize,
+    alignment: Alignment,
 }
 
 /// Initialize a GPIO pin

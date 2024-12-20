@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::Context;
 use chrono::Local;
+use embedded_graphics::text::Alignment;
 use log::{info, trace, warn, LevelFilter};
 use std::{
     sync::{
@@ -92,8 +93,9 @@ impl Controller {
         let now = Local::now();
         self.display.add_text(
             now.format("%_I:%M").to_string(),
-            (132, 0),
+            (250, 0),
             FontSize::Large,
+            Alignment::Right,
         );
 
         // Weather
@@ -101,14 +103,12 @@ impl Controller {
             // Now
             let mut y = 0;
             let now = forecast.now();
-            y += self
-                .display
-                .add_text(now.temperature(), (0, y), FontSize::Large)
-                .1;
-            y += self
-                .display
-                .add_text(now.prob_of_precip(), (0, y), FontSize::Medium)
-                .1;
+            y += self.display.add_text(
+                now.temperature(),
+                (0, y),
+                FontSize::Large,
+                Alignment::Left,
+            );
             y += 8;
 
             // Show the next n periods
@@ -117,19 +117,17 @@ impl Controller {
                 .skip(self.state.weather_period)
                 .take(Self::WEATHER_PERIODS)
             {
-                y += self
-                    .display
-                    .add_text(
-                        format!(
-                            "{} {:>4} {:>4}",
-                            period.start_time().format("%_I%P"),
-                            period.temperature(),
-                            period.prob_of_precip(),
-                        ),
-                        (0, y),
-                        FontSize::Medium,
-                    )
-                    .1;
+                y += self.display.add_text(
+                    format!(
+                        "{} {:>4} {:>4}",
+                        period.start_time().format("%_I%P"),
+                        period.temperature(),
+                        period.prob_of_precip(),
+                    ),
+                    (0, y),
+                    FontSize::Medium,
+                    Alignment::Left,
+                );
             }
         }
     }

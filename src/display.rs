@@ -1,10 +1,5 @@
-use crate::{
-    config::Config,
-    state::{Mode, UserState},
-    weather::Weather,
-};
+use crate::config::Config;
 use anyhow::{anyhow, Context};
-use chrono::Local;
 use embedded_graphics::{
     geometry::Point,
     mono_font::MonoTextStyle,
@@ -30,10 +25,10 @@ const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
 const PIN_DC: u64 = 22; // GPIO/BCM 22, pin 15
 const PIN_RESET: u64 = 27; // GPIO/BCM 27, pin 13
 
-/// Manage state calculation and hardware communication
+/// Manage text state calculation and hardware communication
 pub struct Display {
     // Hardware state
-    controller: Ssd1680<SpidevDevice, SysfsPin, SysfsPin, SysfsPin>,
+    device: Ssd1680<SpidevDevice, SysfsPin, SysfsPin, SysfsPin>,
     display: Display2in13,
 
     // Logical state
@@ -42,13 +37,10 @@ pub struct Display {
     /// The text to be written to the screen soon™. Empty except during a write
     /// tick
     next_text_buffer: Vec<TextItem>,
-    weather: Weather,
 }
 
 impl Display {
     pub const INTERVAL: Duration = Duration::from_millis(1000);
-    /// Number of weather periods we can show at once
-    const WEATHER_PERIODS: usize = 4;
 
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =
@@ -74,86 +66,17 @@ impl Display {
         let mut display = Display2in13::bw();
         display.set_rotation(DisplayRotation::Rotate90);
 
-        let weather = Weather::new(config);
-
         Ok(Self {
-            controller,
+            device: controller,
             display,
             text_buffer: Vec::new(),
             next_text_buffer: Vec::new(),
-            weather,
         })
-    }
-
-    pub fn tick(&mut self, state: &UserState) -> anyhow::Result<()> {
-        trace!("Running display tick");
-
-        match state.mode {
-            Mode::Weather => self.draw_weather(state),
-        }
-
-        // If anything changed, update the screen
-        if self.draw_text()? {
-            trace!("Sending frame to display");
-            self.controller
-                .update_bw_frame(self.display.buffer())
-                .map_err(map_error)?;
-            trace!("Updating display");
-            self.controller
-                .display_frame(&mut Delay)
-                .map_err(map_error)?;
-            trace!("Done updating display");
-        }
-        Ok(())
-    }
-
-    /// Draw screen contents for weather mode
-    fn draw_weather(&mut self, state: &UserState) {
-        // Clock
-        // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
-        let now = Local::now();
-        self.add_text(
-            now.format("%_I:%M").to_string(),
-            (132, 0),
-            FontSize::Large,
-        );
-
-        // Weather
-        if let Some(forecast) = self.weather.forecast() {
-            // Now
-            let mut y = 0;
-            let now = forecast.now();
-            y += self.add_text(now.temperature(), (0, y), FontSize::Large).1;
-            y += self
-                .add_text(now.prob_of_precip(), (0, y), FontSize::Medium)
-                .1;
-            y += 8;
-
-            for period in forecast
-                .future_periods()
-                .skip(state.weather_period)
-                .take(Self::WEATHER_PERIODS)
-            {
-                y += self
-                    .add_text(
-                        format!(
-                            "{}-{} {:>4} {:>4}",
-                            period.start_time().format("%_I%P"),
-                            period.end_time().format("%_I%P"),
-                            period.temperature(),
-                            period.prob_of_precip(),
-                        ),
-                        (0, y),
-                        FontSize::Medium,
-                    )
-                    .1;
-            }
-        }
     }
 
     /// Add text to the buffer, to be written later. Return the dimensions of
     /// the text
-    fn add_text(
+    pub fn add_text(
         &mut self,
         text: String,
         (x, y): (i32, i32),
@@ -170,6 +93,21 @@ impl Display {
             font_size,
         });
         (width, height)
+    }
+
+    /// Draw current text buffer to the screen, if it's changed
+    pub fn draw(&mut self) -> anyhow::Result<()> {
+        // If anything changed, update the screen
+        if self.draw_text()? {
+            trace!("Sending frame to display");
+            self.device
+                .update_bw_frame(self.display.buffer())
+                .map_err(map_error)?;
+            trace!("Updating display");
+            self.device.display_frame(&mut Delay).map_err(map_error)?;
+            trace!("Done updating display");
+        }
+        Ok(())
     }
 
     /// If text has changed, flush all text from the buffer and write to the
@@ -212,10 +150,9 @@ impl Display {
     }
 }
 
-/// Proxy for font sizes, because the ones from embedded_graphics aren't
-/// object-safe
+/// Available font sizes
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum FontSize {
+pub enum FontSize {
     Medium,
     Large,
 }

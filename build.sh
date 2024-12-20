@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+set -ex
 
 PI_HOST=pi@192.168.0.64
 PROJECT_DIR=/home/pi/goldfinger
@@ -20,9 +20,8 @@ EOF
 else
     echo "Running in dev mode..."
     # Run the program directly for testing
-    ssh $PI_HOST << EOF
-        sudo systemctl stop goldfinger
-        cd ./goldfinger
-        RUST_BACKTRACE=1 sudo -E ./goldfinger
-EOF
+    ssh -t $PI_HOST "
+        sudo systemctl stop goldfinger;
+        cd ./goldfinger;
+        RUST_BACKTRACE=1 ./goldfinger"
 fi

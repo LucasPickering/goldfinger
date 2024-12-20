@@ -3,9 +3,15 @@ mod display;
 mod state;
 mod weather;
 
-use crate::{config::Config, display::Display, state::UserState};
+use crate::{
+    config::Config,
+    display::{Display, FontSize},
+    state::{Mode, UserState},
+    weather::Weather,
+};
 use anyhow::Context;
-use log::{info, LevelFilter};
+use chrono::Local;
+use log::{info, trace, warn, LevelFilter};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -21,24 +27,106 @@ fn main() -> anyhow::Result<()> {
         .parse_default_env()
         .init();
 
-    // Spawn a background task to monitor/update hardware
-    let config = Config::load()?;
-    let mut display = Display::new(&config)?;
-    let state = UserState::default();
-
+    let mut controller = Controller::new()?;
     let should_run = Arc::new(AtomicBool::new(true));
 
     let r = should_run.clone();
     ctrlc::set_handler(move || {
+        warn!("Exiting process");
         r.store(false, Ordering::SeqCst);
     })
     .context("Error setting Ctrl-C handler")?;
 
     info!("Starting main loop");
     while should_run.load(Ordering::SeqCst) {
-        display.tick(&state)?;
+        controller.tick()?;
         thread::sleep(Display::INTERVAL);
     }
 
     Ok(())
+}
+
+/// Main controller class
+struct Controller {
+    display: Display,
+    state: UserState,
+    weather: Weather,
+}
+
+impl Controller {
+    /// Number of weather periods we can show at once
+    const WEATHER_PERIODS: usize = 4;
+
+    fn new() -> anyhow::Result<Self> {
+        let config = Config::load()?;
+        let display = Display::new(&config)?;
+        let state = UserState::default();
+        let weather = Weather::new(&config);
+        Ok(Self {
+            display,
+            state,
+            weather,
+        })
+    }
+
+    fn tick(&mut self) -> anyhow::Result<()> {
+        trace!("Running display tick");
+
+        match self.state.mode {
+            Mode::Weather => self.draw_weather(),
+        }
+
+        // Redraw if anything changed
+        self.display.draw()?;
+        Ok(())
+    }
+
+    /// Draw screen contents for weather mode
+    fn draw_weather(&mut self) {
+        // Clock
+        // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+        let now = Local::now();
+        self.display.add_text(
+            now.format("%_I:%M").to_string(),
+            (132, 0),
+            FontSize::Large,
+        );
+
+        // Weather
+        if let Some(forecast) = self.weather.forecast() {
+            // Now
+            let mut y = 0;
+            let now = forecast.now();
+            y += self
+                .display
+                .add_text(now.temperature(), (0, y), FontSize::Large)
+                .1;
+            y += self
+                .display
+                .add_text(now.prob_of_precip(), (0, y), FontSize::Medium)
+                .1;
+            y += 8;
+
+            for period in forecast
+                .future_periods()
+                .skip(self.state.weather_period)
+                .take(Self::WEATHER_PERIODS)
+            {
+                y += self
+                    .display
+                    .add_text(
+                        format!(
+                            "{}-{} {:>4} {:>4}",
+                            period.start_time().format("%_I%P"),
+                            period.end_time().format("%_I%P"),
+                            period.temperature(),
+                            period.prob_of_precip(),
+                        ),
+                        (0, y),
+                        FontSize::Medium,
+                    )
+                    .1;
+            }
+        }
+    }
 }

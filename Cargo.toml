@@ -12,7 +12,6 @@ embedded-graphics = "0.8.1"
 embedded-hal = "1.0.0"
 embedded-vintage-fonts = "0.2.0"
 env_logger = {version = "0.11.5", default-features = false, features = ["auto-color", "humantime"]}
-itertools = "0.13.0"
 log = "0.4.20"
 serde = {version = "1.0.195", features = ["derive"]}
 serde_json = {version = "1.0.111", default-features = false}

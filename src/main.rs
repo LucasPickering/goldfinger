@@ -18,7 +18,11 @@ use std::{
         Arc,
     },
     thread,
+    time::Duration,
 };
+
+/// Frequence to recalcuate display contents
+const INTERVAL: Duration = Duration::from_millis(1000);
 
 fn main() -> anyhow::Result<()> {
     env_logger::builder()
@@ -40,7 +44,7 @@ fn main() -> anyhow::Result<()> {
     info!("Starting main loop");
     while should_run.load(Ordering::SeqCst) {
         controller.tick()?;
-        thread::sleep(Display::INTERVAL);
+        thread::sleep(INTERVAL);
     }
 
     Ok(())
@@ -107,6 +111,7 @@ impl Controller {
                 .1;
             y += 8;
 
+            // Show the next n periods
             for period in forecast
                 .future_periods()
                 .skip(self.state.weather_period)
@@ -116,9 +121,8 @@ impl Controller {
                     .display
                     .add_text(
                         format!(
-                            "{}-{} {:>4} {:>4}",
+                            "{} {:>4} {:>4}",
                             period.start_time().format("%_I%P"),
-                            period.end_time().format("%_I%P"),
                             period.temperature(),
                             period.prob_of_precip(),
                         ),

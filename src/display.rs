@@ -19,7 +19,7 @@ use ssd1680::{
     driver::{DisplayError, Ssd1680},
     graphics::{Display as _, Display2in13, DisplayRotation},
 };
-use std::{mem, time::Duration};
+use std::mem;
 
 const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
 const PIN_DC: u64 = 22; // GPIO/BCM 22, pin 15
@@ -40,8 +40,6 @@ pub struct Display {
 }
 
 impl Display {
-    pub const INTERVAL: Duration = Duration::from_millis(1000);
-
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =
             SpidevDevice::open(&config.display_port).context("SPI device")?;

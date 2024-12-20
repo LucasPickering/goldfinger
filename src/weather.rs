@@ -19,14 +19,14 @@ pub struct Weather {
 }
 
 impl Weather {
-    const FORECAST_TTL: Duration = Duration::from_secs(600);
+    const FORECAST_TTL: Duration = Duration::from_secs(60);
     const API_HOST: &'static str = "https://api.weather.gov";
     // Start and end (inclusive) of forecast times that *should* be shown.
     // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
     const DAY_START: NaiveTime = NaiveTime::from_hms_opt(4, 30, 0).unwrap();
     const DAY_END: NaiveTime = NaiveTime::from_hms_opt(22, 30, 0).unwrap();
     /// We show every n periods in the future
-    const PERIOD_INTERNAL: usize = 3;
+    const PERIOD_INTERNAL: usize = 4;
 
     pub fn new(config: &Config) -> Self {
         let url = format!(
@@ -130,16 +130,16 @@ impl Forecast {
         &self.properties.periods[0]
     }
 
-    /// Get the list of *future* periods that should be shown. This skips
-    /// periods in the middle of the night, as well as the current period.
-    /// Windows will be joined together, with [Weather::JOINED_PERIODS].
-    pub fn future_periods(&self) -> impl '_ + Iterator<Item = &ForecastPeriod> {
+    /// Get the list of periods that should be shown in the list. This skips
+    /// periods in the middle of the night.
+    pub fn display_periods(
+        &self,
+    ) -> impl '_ + Iterator<Item = &ForecastPeriod> {
         let day_range = Weather::DAY_START..=Weather::DAY_END;
         self.properties
             .periods
             .iter()
             .step_by(Weather::PERIOD_INTERNAL)
-            .skip(1) // Skip current period
             .filter(move |period| {
                 day_range.contains(&period.start_time().time())
             })
@@ -239,7 +239,7 @@ mod tests {
             },
         };
 
-        let periods: Vec<_> = forecast.future_periods().collect();
+        let periods: Vec<_> = forecast.display_periods().collect();
         assert_eq!(
             periods.as_slice(),
             &[

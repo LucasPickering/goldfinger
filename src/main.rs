@@ -10,7 +10,6 @@ use crate::{
     weather::Weather,
 };
 use anyhow::Context;
-use chrono::Local;
 use embedded_graphics::text::Alignment;
 use log::{info, trace, warn, LevelFilter};
 use std::{
@@ -88,16 +87,6 @@ impl Controller {
 
     /// Draw screen contents for weather mode
     fn draw_weather(&mut self) {
-        // Clock
-        // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
-        let now = Local::now();
-        self.display.add_text(
-            now.format("%_I:%M").to_string(),
-            (250, 0),
-            FontSize::Large,
-            Alignment::Right,
-        );
-
         // Weather
         if let Some(forecast) = self.weather.forecast() {
             // Now
@@ -113,7 +102,7 @@ impl Controller {
 
             // Show the next n periods
             for period in forecast
-                .future_periods()
+                .display_periods()
                 .skip(self.state.weather_period)
                 .take(Self::WEATHER_PERIODS)
             {

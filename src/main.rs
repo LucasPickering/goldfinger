@@ -94,18 +94,21 @@ impl Controller {
             // Now
             let now = forecast.now();
             let temperature = now.temperature();
-            let big_temperature_text =
+            let temperature_text =
                 text(&temperature, (0, 0), FontSize::Large, Alignment::Left);
-            let mut next = self.display.draw_text(&big_temperature_text)?;
+            let temperature_right =
+                temperature_text.bounding_box().anchor_x(AnchorX::Right);
+            let mut next = self.display.draw_text(&temperature_text)?;
+            // Draw time and current PoP just to the right
+            let right_next = self.display.draw_text(&text(
+                "TODO",
+                (0, temperature_right),
+                FontSize::Medium,
+                Alignment::Left,
+            ))?;
             self.display.draw_text(&text(
                 &now.prob_of_precip(),
-                (
-                    0,
-                    // Go just to the right of the temperature
-                    big_temperature_text
-                        .bounding_box()
-                        .anchor_x(AnchorX::Right),
-                ),
+                right_next,
                 FontSize::Medium,
                 Alignment::Left,
             ))?;

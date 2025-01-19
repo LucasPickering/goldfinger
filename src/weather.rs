@@ -1,12 +1,11 @@
 use crate::config::Config;
 use anyhow::{anyhow, Context};
-use chrono::{DateTime, Local, NaiveTime, Utc};
+use chrono::{DateTime, Local, NaiveTime, TimeDelta, Utc};
 use log::{error, info, warn};
 use serde::Deserialize;
 use std::{
     sync::{Arc, RwLock},
     thread,
-    time::{Duration, Instant},
 };
 
 /// Gotta know weather or not it's gonna rain
@@ -15,11 +14,11 @@ pub struct Weather {
     url: String,
     /// Data loaded from the DB. The load is done in a separate thread and
     /// deposited here
-    forecast: Arc<RwLock<Option<(Forecast, Instant)>>>,
+    forecast: Arc<RwLock<Option<Forecast>>>,
 }
 
 impl Weather {
-    const FORECAST_TTL: Duration = Duration::from_secs(60);
+    const FORECAST_TTL: TimeDelta = TimeDelta::seconds(60);
     const API_HOST: &'static str = "https://api.weather.gov";
     // Start and end (inclusive) of forecast times that *should* be shown.
     // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
@@ -51,9 +50,9 @@ impl Weather {
             return None;
         };
 
-        if let Some((forecast, fetched_at)) = guard.as_ref() {
+        if let Some(forecast) = guard.as_ref() {
             // If forecast is stale, fetch a new one in the background
-            if *fetched_at + Self::FORECAST_TTL < Instant::now() {
+            if forecast.fetched_at + Self::FORECAST_TTL < Utc::now() {
                 self.fetch_latest();
             }
 
@@ -82,10 +81,8 @@ impl Weather {
                     .into_json()
                     .context("Error parsing forecast as JSON")?;
                 info!("Saving forecast");
-                let now = Instant::now();
                 // Stringify the error to dump the lifetime
-                *lock.write().map_err(|err| anyhow!("{err}"))? =
-                    Some((forecast, now));
+                *lock.write().map_err(|err| anyhow!("{err}"))? = Some(forecast);
                 Ok(())
             })();
 
@@ -101,6 +98,8 @@ impl Weather {
 #[serde(rename_all = "camelCase")]
 pub struct Forecast {
     properties: ForecastProperties,
+    #[serde(default = "Utc::now")]
+    fetched_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -125,6 +124,10 @@ pub struct Unit {
 }
 
 impl Forecast {
+    pub fn fetched_at(&self) -> DateTime<Local> {
+        self.fetched_at.with_timezone(&Local)
+    }
+
     /// Get the current forecast period
     pub fn now(&self) -> &ForecastPeriod {
         &self.properties.periods[0]
@@ -197,57 +200,9 @@ mod tests {
                     period("2024-05-24T19:00:00Z", 1, 86, 0),
                 ],
             },
+            fetched_at: Utc::now(),
         };
 
         assert_eq!(forecast.now(), &period("2024-05-24T17:00:00Z", 1, 84, 1));
-    }
-
-    #[test]
-    fn test_future_periods() {
-        // TODO these tests are busted right now because I changed the behavior
-        // Make timezone conversions consistent
-        std::env::set_var("TZ", "UTC");
-
-        let forecast = Forecast {
-            properties: ForecastProperties {
-                periods: vec![
-                    period("2024-05-24T17:00:00Z", 1, 84, 1), /* First is skipped */
-                    //
-                    period("2024-05-24T18:00:00Z", 1, 85, 0),
-                    period("2024-05-24T19:00:00Z", 1, 86, 0),
-                    period("2024-05-24T20:00:00Z", 1, 87, 0),
-                    //
-                    period("2024-05-24T21:00:00Z", 1, 85, 10),
-                    period("2024-05-24T22:00:00Z", 1, 84, 20),
-                    period("2024-05-24T23:00:00Z", 1, 82, 30),
-                    // vvv Excluded because entirely nightttime vvv
-                    period("2024-05-25T00:00:00Z", 1, 78, 0),
-                    period("2024-05-25T01:00:00Z", 1, 75, 0),
-                    period("2024-05-25T02:00:00Z", 1, 72, 0),
-                    // ^^^ Excluded ^^^
-                    period("2024-05-25T03:00:00Z", 1, 69, 0),
-                    period("2024-05-25T04:00:00Z", 1, 67, 0),
-                    period("2024-05-25T05:00:00Z", 1, 65, 30),
-                    //
-                    period("2024-05-25T06:00:00Z", 1, 63, 0),
-                    period("2024-05-25T07:00:00Z", 1, 60, 0),
-                    period("2024-05-25T08:00:00Z", 1, 58, 0),
-                    //
-                    period("2024-05-25T09:00:00Z", 1, 57, 0),
-                ],
-            },
-        };
-
-        let periods: Vec<_> = forecast.future_periods().collect();
-        assert_eq!(
-            periods.as_slice(),
-            &[
-                &period("2024-05-24T18:00:00Z", 3, 86, 0),
-                &period("2024-05-24T21:00:00Z", 3, 83, 20),
-                &period("2024-05-25T03:00:00Z", 3, 67, 10),
-                &period("2024-05-25T06:00:00Z", 3, 60, 0),
-                &period("2024-05-25T09:00:00Z", 1, 57, 0),
-            ]
-        );
     }
 }

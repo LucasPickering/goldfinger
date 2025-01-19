@@ -70,29 +70,32 @@ impl Controller {
     fn tick(&mut self) -> anyhow::Result<()> {
         trace!("Running display tick");
 
-        self.draw_weather()?;
+        self.draw()?;
 
         // Redraw if anything changed
         self.display.draw()?;
         Ok(())
     }
 
-    /// Draw screen contents for weather mode
-    fn draw_weather(&mut self) -> anyhow::Result<()> {
+    /// Draw screen contents
+    fn draw(&mut self) -> anyhow::Result<()> {
         // Weather
         if let Some(forecast) = self.weather.forecast() {
-            // Now
             let now = forecast.now();
-            let temperature = now.temperature();
+
+            // Current temperature
+            let temperature = format!("{}\n", now.temperature());
             let temperature_text =
                 text(&temperature, (0, 0), FontSize::Large, Alignment::Left);
             let temperature_right =
                 temperature_text.bounding_box().anchor_x(AnchorX::Right);
             let mut next = self.display.draw_text(&temperature_text)?;
+            next.y += 8; // Padding
+
             // Draw time and current PoP just to the right
             let right_next = self.display.draw_text(&text(
-                "TODO",
-                (0, temperature_right),
+                &forecast.fetched_at().format("%-I:%M\n").to_string(),
+                (temperature_right, 0),
                 FontSize::Medium,
                 Alignment::Left,
             ))?;
@@ -103,14 +106,12 @@ impl Controller {
                 Alignment::Left,
             ))?;
 
-            next.y += 8; // Padding
-
             // Show the next n periods
             for period in forecast.future_periods().take(Self::WEATHER_PERIODS)
             {
                 next = self.display.draw_text(&text(
                     &format!(
-                        "{} {:>4} {:>4}",
+                        "{} {:>4} {:>4}\n",
                         period.start_time().format("%_I%P"),
                         period.temperature(),
                         period.prob_of_precip(),

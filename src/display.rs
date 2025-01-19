@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context};
 use embedded_graphics::{
     geometry::Point,
     pixelcolor::BinaryColor,
-    text::{Alignment, Baseline, TextStyleBuilder},
+    text::{Alignment, Baseline, LineHeight, TextStyleBuilder},
     Drawable,
 };
 use linux_embedded_hal::{
@@ -115,6 +115,14 @@ impl FontSize {
             ),
         }
     }
+
+    /// Line height (in pixels) to get compact text
+    fn line_height(&self) -> u32 {
+        match self {
+            FontSize::Medium => 19,
+            FontSize::Large => 40,
+        }
+    }
 }
 
 /// Build a text object
@@ -128,6 +136,7 @@ pub fn text(
     let text_style = TextStyleBuilder::new()
         .baseline(Baseline::Top)
         .alignment(alignment)
+        .line_height(LineHeight::Pixels(font_size.line_height()))
         .build();
     Text::with_text_style(text, position.into(), character_style, text_style)
 }

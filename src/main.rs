@@ -5,12 +5,14 @@ mod weather;
 
 use crate::{
     config::Config,
-    display::{Display, FontSize},
+    display::{text, Display, FontSize},
     state::{Mode, UserState},
     weather::Weather,
 };
 use anyhow::Context;
-use embedded_graphics::text::Alignment;
+use embedded_graphics::{
+    geometry::AnchorX, prelude::Dimensions, text::Alignment,
+};
 use log::{info, trace, warn, LevelFilter};
 use std::{
     sync::{
@@ -77,7 +79,7 @@ impl Controller {
         trace!("Running display tick");
 
         match self.state.mode {
-            Mode::Weather => self.draw_weather(),
+            Mode::Weather => self.draw_weather()?,
         }
 
         // Redraw if anything changed
@@ -86,25 +88,29 @@ impl Controller {
     }
 
     /// Draw screen contents for weather mode
-    fn draw_weather(&mut self) {
+    fn draw_weather(&mut self) -> anyhow::Result<()> {
         // Weather
         if let Some(forecast) = self.weather.forecast() {
             // Now
-            let mut y = 0;
             let now = forecast.now();
-            y += self.display.add_text(
-                now.temperature(),
-                (0, y),
-                FontSize::Large,
-                Alignment::Left,
-            );
-            self.display.add_text(
-                now.prob_of_precip(),
-                (100, 0),
+            let temperature = now.temperature();
+            let big_temperature_text =
+                text(&temperature, (0, 0), FontSize::Large, Alignment::Left);
+            let mut next = self.display.draw_text(&big_temperature_text)?;
+            self.display.draw_text(&text(
+                &now.prob_of_precip(),
+                (
+                    0,
+                    // Go just to the right of the temperature
+                    big_temperature_text
+                        .bounding_box()
+                        .anchor_x(AnchorX::Right),
+                ),
                 FontSize::Medium,
                 Alignment::Left,
-            );
-            y += 8;
+            ))?;
+
+            next.y += 8; // Padding
 
             // Show the next n periods
             for period in forecast
@@ -112,18 +118,20 @@ impl Controller {
                 .skip(self.state.weather_period)
                 .take(Self::WEATHER_PERIODS)
             {
-                y += self.display.add_text(
-                    format!(
+                next = self.display.draw_text(&text(
+                    &format!(
                         "{} {:>4} {:>4}",
                         period.start_time().format("%_I%P"),
                         period.temperature(),
                         period.prob_of_precip(),
                     ),
-                    (0, y),
+                    next,
                     FontSize::Medium,
                     Alignment::Left,
-                );
+                ))?;
             }
         }
+
+        Ok(())
     }
 }

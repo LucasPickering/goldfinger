@@ -70,15 +70,15 @@ impl Controller {
     fn tick(&mut self) -> anyhow::Result<()> {
         trace!("Running display tick");
 
-        self.draw()?;
+        self.draw();
 
         // Redraw if anything changed
         self.display.draw()?;
         Ok(())
     }
 
-    /// Draw screen contents
-    fn draw(&mut self) -> anyhow::Result<()> {
+    /// Draw screen contents to the buffer (but don't update the hardware)
+    fn draw(&mut self) {
         // Weather
         if let Some(forecast) = self.weather.forecast() {
             let now = forecast.now();
@@ -89,7 +89,7 @@ impl Controller {
                 text(&temperature, (0, 0), FontSize::Large, Alignment::Left);
             let temperature_right =
                 temperature_text.bounding_box().anchor_x(AnchorX::Right);
-            let mut next = self.display.draw_text(&temperature_text)?;
+            let mut next = self.display.draw_text(&temperature_text);
             next.y += 8; // Padding
 
             // Draw current PoP just to the right
@@ -98,7 +98,7 @@ impl Controller {
                 (temperature_right, 0),
                 FontSize::Medium,
                 Alignment::Left,
-            ))?;
+            ));
 
             // Show the next n periods
             for period in forecast.future_periods().take(Self::WEATHER_PERIODS)
@@ -113,10 +113,8 @@ impl Controller {
                     next,
                     FontSize::Medium,
                     Alignment::Left,
-                ))?;
+                ));
             }
         }
-
-        Ok(())
     }
 }

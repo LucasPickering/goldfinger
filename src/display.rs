@@ -1,8 +1,9 @@
 use crate::config::Config;
 use anyhow::{anyhow, Context};
+use display_interface::DisplayError;
+use display_interface_spi::SPIInterface;
 use embedded_graphics::{
     geometry::Point,
-    pixelcolor::BinaryColor,
     text::{Alignment, Baseline, LineHeight, TextStyleBuilder},
     Drawable,
 };
@@ -12,24 +13,28 @@ use linux_embedded_hal::{
     Delay, SpidevDevice, SysfsPin,
 };
 use log::{info, trace};
-use ssd1680::{
-    color::Color,
-    driver::{DisplayError, Ssd1680},
-    graphics::{Display as _, Display2in13, DisplayRotation},
-};
 use u8g2_fonts::{fonts, U8g2TextStyle};
+use weact_studio_epd::{
+    graphics::{Display213BlackWhite, DisplayRotation},
+    Color, WeActStudio213BlackWhiteDriver,
+};
 
 const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
 const PIN_DC: u64 = 22; // GPIO/BCM 22, pin 15
 const PIN_RESET: u64 = 27; // GPIO/BCM 27, pin 13
 
-type Text<'a> = embedded_graphics::text::Text<'a, U8g2TextStyle<BinaryColor>>;
+type Text<'a> = embedded_graphics::text::Text<'a, U8g2TextStyle<Color>>;
 
 /// Manage text state calculation and hardware communication
 pub struct Display {
     // Hardware state
-    device: Ssd1680<SpidevDevice, SysfsPin, SysfsPin, SysfsPin>,
-    display: Display2in13,
+    device: WeActStudio213BlackWhiteDriver<
+        SPIInterface<SpidevDevice, SysfsPin>,
+        SysfsPin,
+        SysfsPin,
+        Delay,
+    >,
+    display: Display213BlackWhite,
 
     // Logical state
     /// The text currently on the screen
@@ -53,12 +58,18 @@ impl Display {
             init_pin(PIN_DC, Direction::Out).context("Initializing pin D/C")?;
         let busy = init_pin(PIN_BUSY, Direction::In)
             .context("Initializing pin Busy")?;
+        let spi_interface = SPIInterface::new(spi, dc);
 
-        let controller = Ssd1680::new(spi, busy, dc, reset, &mut Delay)
-            .map_err(map_error)?;
+        let mut controller = WeActStudio213BlackWhiteDriver::new(
+            spi_interface,
+            busy,
+            reset,
+            Delay,
+        );
+        controller.init().map_err(map_error)?;
         info!("Display controller initialized");
 
-        let mut display = Display2in13::bw();
+        let mut display = Display213BlackWhite::new();
         display.set_rotation(DisplayRotation::Rotate90);
 
         Ok(Self {
@@ -69,20 +80,16 @@ impl Display {
     }
 
     /// Draw some text to the screen buffer
-    pub fn draw_text(&mut self, text: &Text) -> anyhow::Result<Point> {
-        text.draw(&mut self.display).map_err(map_error)
+    pub fn draw_text(&mut self, text: &Text) -> Point {
+        text.draw(&mut self.display).expect("Infallible")
     }
 
     /// Draw current text buffer to the screen, if it's changed
     pub fn draw(&mut self) -> anyhow::Result<()> {
         // If anything changed, update the screen
         if self.display.buffer() != self.text_buffer {
-            trace!("Sending frame to display");
-            self.device
-                .update_bw_frame(self.display.buffer())
-                .map_err(map_error)?;
             trace!("Updating display");
-            self.device.display_frame(&mut Delay).map_err(map_error)?;
+            self.device.fast_update(&self.display).map_err(map_error)?;
             // Store this buffer so we can check if it's changed later
             self.text_buffer = self.display.buffer().to_owned();
             trace!("Done updating display");
@@ -96,7 +103,7 @@ impl Display {
 
     /// Clear the screen buffer
     fn clear(&mut self) {
-        self.display.clear_buffer(Color::White);
+        self.display.clear(Color::White);
     }
 }
 
@@ -117,15 +124,15 @@ pub enum FontSize {
 }
 
 impl FontSize {
-    fn font(&self) -> U8g2TextStyle<BinaryColor> {
+    fn font(&self) -> U8g2TextStyle<Color> {
         match self {
             FontSize::Medium => U8g2TextStyle::new(
                 fonts::u8g2_font_spleen12x24_me,
-                BinaryColor::Off,
+                Color::Black,
             ),
             FontSize::Large => U8g2TextStyle::new(
                 fonts::u8g2_font_spleen32x64_me,
-                BinaryColor::Off,
+                Color::Black,
             ),
         }
     }

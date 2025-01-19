@@ -1,9 +1,0 @@
-{
-  "display_port": "/dev/spidev0.0",
-  "forecast_office": "BOX",
-  "forecast_gridpoint": [
-    71,
-    90
-  ],
-  "openweather_token_file": "./openweather_token.txt"
-}

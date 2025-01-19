@@ -92,16 +92,10 @@ impl Controller {
             let mut next = self.display.draw_text(&temperature_text)?;
             next.y += 8; // Padding
 
-            // Draw time and current PoP just to the right
-            let right_next = self.display.draw_text(&text(
-                &forecast.fetched_at().format("%-I:%M\n").to_string(),
-                (temperature_right, 0),
-                FontSize::Medium,
-                Alignment::Left,
-            ))?;
+            // Draw current PoP just to the right
             self.display.draw_text(&text(
                 &now.prob_of_precip(),
-                right_next,
+                (temperature_right, 0),
                 FontSize::Medium,
                 Alignment::Left,
             ))?;

@@ -68,7 +68,7 @@ impl Display {
         })
     }
 
-    /// TODO
+    /// Draw some text to the screen buffer
     pub fn draw_text(&mut self, text: &Text) -> anyhow::Result<Point> {
         text.draw(&mut self.display).map_err(map_error)
     }
@@ -90,8 +90,22 @@ impl Display {
 
         // After attempting a draw, clear no matter what so the next frame is
         // from a clean slate
-        self.display.clear_buffer(Color::White);
+        self.clear();
         Ok(())
+    }
+
+    /// Clear the screen buffer
+    fn clear(&mut self) {
+        self.display.clear_buffer(Color::White);
+    }
+}
+
+impl Drop for Display {
+    fn drop(&mut self) {
+        // Clear the screen on shutdown
+        info!("Clearing display for shutdown");
+        self.clear();
+        let _ = self.draw();
     }
 }
 

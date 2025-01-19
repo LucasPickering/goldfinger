@@ -1,11 +1,12 @@
 use crate::config::Config;
 use anyhow::{anyhow, Context};
-use chrono::{DateTime, Local, NaiveTime, TimeDelta, Utc};
+use chrono::{DateTime, Local, NaiveTime, Utc};
 use log::{error, info, warn};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::{
     sync::{Arc, RwLock},
     thread,
+    time::{Duration, Instant},
 };
 
 /// Gotta know weather or not it's gonna rain
@@ -18,7 +19,7 @@ pub struct Weather {
 }
 
 impl Weather {
-    const FORECAST_TTL: TimeDelta = TimeDelta::seconds(60);
+    const FORECAST_TTL: Duration = Duration::from_secs(60);
     const API_HOST: &'static str = "https://api.weather.gov";
     // Start and end (inclusive) of forecast times that *should* be shown.
     // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
@@ -52,7 +53,7 @@ impl Weather {
 
         if let Some(forecast) = guard.as_ref() {
             // If forecast is stale, fetch a new one in the background
-            if forecast.fetched_at + Self::FORECAST_TTL < Utc::now() {
+            if forecast.fetched_at + Self::FORECAST_TTL < Instant::now() {
                 self.fetch_latest();
             }
 
@@ -98,8 +99,8 @@ impl Weather {
 #[serde(rename_all = "camelCase")]
 pub struct Forecast {
     properties: ForecastProperties,
-    #[serde(default = "Utc::now")]
-    fetched_at: DateTime<Utc>,
+    #[serde(deserialize_with = "now", default = "Instant::now")]
+    fetched_at: Instant,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -124,10 +125,6 @@ pub struct Unit {
 }
 
 impl Forecast {
-    pub fn fetched_at(&self) -> DateTime<Local> {
-        self.fetched_at.with_timezone(&Local)
-    }
-
     /// Get the current forecast period
     pub fn now(&self) -> &ForecastPeriod {
         &self.properties.periods[0]
@@ -168,6 +165,10 @@ impl ForecastPeriod {
     }
 }
 
+fn now<'de, D: Deserializer<'de>>(_: D) -> Result<Instant, D::Error> {
+    Ok(Instant::now())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,7 +201,7 @@ mod tests {
                     period("2024-05-24T19:00:00Z", 1, 86, 0),
                 ],
             },
-            fetched_at: Utc::now(),
+            fetched_at: Instant::now(),
         };
 
         assert_eq!(forecast.now(), &period("2024-05-24T17:00:00Z", 1, 84, 1));

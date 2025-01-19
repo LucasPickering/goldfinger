@@ -1,12 +1,10 @@
 mod config;
 mod display;
-mod state;
 mod weather;
 
 use crate::{
     config::Config,
     display::{text, Display, FontSize},
-    state::{Mode, UserState},
     weather::Weather,
 };
 use anyhow::Context;
@@ -55,7 +53,6 @@ fn main() -> anyhow::Result<()> {
 /// Main controller class
 struct Controller {
     display: Display,
-    state: UserState,
     weather: Weather,
 }
 
@@ -66,21 +63,14 @@ impl Controller {
     fn new() -> anyhow::Result<Self> {
         let config = Config::load()?;
         let display = Display::new(&config)?;
-        let state = UserState::default();
         let weather = Weather::new(&config);
-        Ok(Self {
-            display,
-            state,
-            weather,
-        })
+        Ok(Self { display, weather })
     }
 
     fn tick(&mut self) -> anyhow::Result<()> {
         trace!("Running display tick");
 
-        match self.state.mode {
-            Mode::Weather => self.draw_weather()?,
-        }
+        self.draw_weather()?;
 
         // Redraw if anything changed
         self.display.draw()?;
@@ -116,10 +106,7 @@ impl Controller {
             next.y += 8; // Padding
 
             // Show the next n periods
-            for period in forecast
-                .future_periods()
-                .skip(self.state.weather_period)
-                .take(Self::WEATHER_PERIODS)
+            for period in forecast.future_periods().take(Self::WEATHER_PERIODS)
             {
                 next = self.display.draw_text(&text(
                     &format!(

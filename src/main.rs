@@ -98,11 +98,17 @@ impl Controller {
                 FontSize::Large,
                 Alignment::Left,
             );
+            self.display.add_text(
+                now.prob_of_precip(),
+                (100, 0),
+                FontSize::Medium,
+                Alignment::Left,
+            );
             y += 8;
 
             // Show the next n periods
             for period in forecast
-                .display_periods()
+                .future_periods()
                 .skip(self.state.weather_period)
                 .take(Self::WEATHER_PERIODS)
             {

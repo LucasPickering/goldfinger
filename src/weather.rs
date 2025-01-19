@@ -132,13 +132,12 @@ impl Forecast {
 
     /// Get the list of periods that should be shown in the list. This skips
     /// periods in the middle of the night.
-    pub fn display_periods(
-        &self,
-    ) -> impl '_ + Iterator<Item = &ForecastPeriod> {
+    pub fn future_periods(&self) -> impl '_ + Iterator<Item = &ForecastPeriod> {
         let day_range = Weather::DAY_START..=Weather::DAY_END;
         self.properties
             .periods
             .iter()
+            .skip(1)
             .step_by(Weather::PERIOD_INTERNAL)
             .filter(move |period| {
                 day_range.contains(&period.start_time().time())
@@ -239,7 +238,7 @@ mod tests {
             },
         };
 
-        let periods: Vec<_> = forecast.display_periods().collect();
+        let periods: Vec<_> = forecast.future_periods().collect();
         assert_eq!(
             periods.as_slice(),
             &[

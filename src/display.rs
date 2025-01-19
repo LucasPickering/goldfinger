@@ -124,7 +124,7 @@ pub enum FontSize {
 }
 
 impl FontSize {
-    fn font(&self) -> U8g2TextStyle<Color> {
+    pub fn font(&self) -> U8g2TextStyle<Color> {
         match self {
             FontSize::Medium => U8g2TextStyle::new(
                 fonts::u8g2_font_spleen12x24_me,

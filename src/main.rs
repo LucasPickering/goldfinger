@@ -1,15 +1,20 @@
 mod config;
 mod display;
+mod transit;
+mod util;
 mod weather;
 
 use crate::{
     config::Config,
     display::{text, Display, FontSize},
+    transit::Transit,
     weather::Weather,
 };
 use anyhow::Context;
 use embedded_graphics::{
-    geometry::AnchorX, prelude::Dimensions, text::Alignment,
+    geometry::AnchorX,
+    prelude::{Dimensions, Point},
+    text::Alignment,
 };
 use log::{info, trace, warn, LevelFilter};
 use std::{
@@ -54,6 +59,7 @@ fn main() -> anyhow::Result<()> {
 struct Controller {
     display: Display,
     weather: Weather,
+    transit: Transit,
 }
 
 impl Controller {
@@ -64,7 +70,12 @@ impl Controller {
         let config = Config::load()?;
         let display = Display::new(&config)?;
         let weather = Weather::new(&config);
-        Ok(Self { display, weather })
+        let transit = Transit::new(&config);
+        Ok(Self {
+            display,
+            weather,
+            transit,
+        })
     }
 
     fn tick(&mut self) -> anyhow::Result<()> {
@@ -115,6 +126,24 @@ impl Controller {
                     Alignment::Left,
                 ));
             }
+        }
+
+        // Transit
+        let predictions = self.transit.predictions();
+        let right = 250;
+        let mut next = Point::new(right, 0);
+        for line in predictions.lines {
+            next = self.display.draw_text(&text(
+                &format!(
+                    "{}\n{}\n{}\n",
+                    line.name, line.inbound, line.outbound
+                ),
+                next,
+                FontSize::Medium,
+                Alignment::Right,
+            ));
+            next.x = right; // The returned x is a bit shifted for some reason
+            next.y += 16; // Padding between lines
         }
     }
 }

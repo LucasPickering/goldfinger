@@ -96,8 +96,12 @@ impl Controller {
 
             // Current temperature
             let temperature = format!("{}\n", now.temperature());
-            let temperature_text =
-                text(&temperature, (0, 0), FontSize::Large, Alignment::Left);
+            let temperature_text = text(
+                &temperature,
+                (Display::LEFT, Display::TOP),
+                FontSize::Large,
+                Alignment::Left,
+            );
             let temperature_right =
                 temperature_text.bounding_box().anchor_x(AnchorX::Right);
             let mut next = self.display.draw_text(&temperature_text);
@@ -106,7 +110,7 @@ impl Controller {
             // Draw current PoP just to the right
             self.display.draw_text(&text(
                 &now.prob_of_precip(),
-                (temperature_right, 0),
+                (temperature_right, Display::TOP),
                 FontSize::Medium,
                 Alignment::Left,
             ));
@@ -130,8 +134,7 @@ impl Controller {
 
         // Transit
         let predictions = self.transit.predictions();
-        let right = 250;
-        let mut next = Point::new(right, 0);
+        let mut next = Point::new(Display::RIGHT, Display::TOP);
         for line in predictions.lines {
             next = self.display.draw_text(&text(
                 &format!(
@@ -142,8 +145,9 @@ impl Controller {
                 FontSize::Medium,
                 Alignment::Right,
             ));
-            next.x = right; // The returned x is a bit shifted for some reason
-            next.y += 16; // Padding between lines
+            // The returned x is a bit shifted for some reason, so reset it
+            next.x = Display::RIGHT;
+            next.y += 8; // Padding between lines
         }
     }
 }

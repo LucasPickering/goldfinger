@@ -42,6 +42,14 @@ pub struct Display {
 }
 
 impl Display {
+    /// X coordinate of the left edge of the screen
+    pub const LEFT: i32 = 0;
+    /// X coordinate of the right edge of the screen
+    pub const RIGHT: i32 = 250;
+    /// Y coordinate of the top edge of the screen. The first 6 rows of the
+    /// buffer are not visible
+    pub const TOP: i32 = 6;
+
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =
             SpidevDevice::open(&config.display_port).context("SPI device")?;
@@ -97,22 +105,18 @@ impl Display {
 
         // After attempting a draw, clear no matter what so the next frame is
         // from a clean slate
-        self.clear();
-        Ok(())
-    }
-
-    /// Clear the screen buffer
-    fn clear(&mut self) {
         self.display.clear(Color::White);
+        Ok(())
     }
 }
 
 impl Drop for Display {
     fn drop(&mut self) {
-        // Clear the screen on shutdown
+        // Clear the screen on shutdown. A fast refresh leaves ghost text
+        // behind, so do a full one
         info!("Clearing display for shutdown");
-        self.clear();
-        let _ = self.draw();
+        let _ = self.device.clear_bw_buffer();
+        let _ = self.device.full_refresh();
     }
 }
 

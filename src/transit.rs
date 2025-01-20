@@ -139,7 +139,7 @@ impl From<Vec<DateTime<Utc>>> for CountdownList {
 
 impl Display for CountdownList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.iter().format(", "))
+        write!(f, "{}m", self.0.iter().format(","))
     }
 }
 
@@ -149,7 +149,7 @@ pub struct Countdown(i64);
 
 impl Display for Countdown {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}m", self.0)
+        write!(f, "{}", self.0)
     }
 }
 

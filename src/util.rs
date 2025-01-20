@@ -32,7 +32,6 @@ where
 
     /// Get the latest data. If the data is missing or outdated, spawn a task to
     /// re-fetch it
-    /// TODO remove clone
     pub fn data(&self) -> Option<T> {
         let Some(guard) = self.data.try_read().ok() else {
             // Content is so low that we don't ever expect to hit this

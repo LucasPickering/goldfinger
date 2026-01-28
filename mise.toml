@@ -1,0 +1,40 @@
+[env]
+PI_DIR = "/home/pi/goldfinger"
+PI_HOST = "pi@192.168.0.64"
+PI_TARGET = "arm-unknown-linux-musleabihf"
+BINARY_PATH = "target/{{env.PI_TARGET}}/release/goldfinger"
+RUST_BACKTRACE = 1
+
+[tasks.build]
+description = "Build for the Pi"
+sources = ["Cargo.toml", "Cargo.lock", "src/**/*.rs"]
+outputs = ["{{env.BINARY_PATH}}"]
+run = "cargo build --release --target {{env.PI_TARGET}}"
+
+[tasks.copy]
+depends = ["build"]
+description = "Copy build files to the Pi"
+sources = ["goldfinger.service", "config.json", "{{env.BINARY_PATH}}"]
+run = [
+    """rsync -r -vv \
+    goldfinger.service config.json {{env.BINARY_PATH}} {{env.PI_HOST}}:{{env.PI_DIR}}""",
+]
+
+[tasks.deploy]
+depends = ["copy"]
+description = "Run on the Pi"
+run = """ssh {{env.PI_HOST}} << EOF
+    sudo systemctl link $PROJECT_DIR/goldfinger.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable goldfinger
+    sudo systemctl restart goldfinger
+EOF"""
+
+[tasks.dev]
+depends = ["copy"]
+description = "Run directly on the Pi (without systemd) for testing"
+run = """ssh -t $PI_HOST "
+    sudo systemctl stop goldfinger;
+    cd ./goldfinger;
+    RUST_BACKTRACE=1 sudo -E ./goldfinger"
+"""

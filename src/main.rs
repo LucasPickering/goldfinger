@@ -26,8 +26,8 @@ use std::{
     time::Duration,
 };
 
-/// Frequence to recalcuate display contents
-const INTERVAL: Duration = Duration::from_millis(1000);
+/// Frequency to recalcuate display contents
+const LOOP_INTERVAL: Duration = Duration::from_millis(1000);
 
 fn main() -> anyhow::Result<()> {
     env_logger::builder()
@@ -49,7 +49,7 @@ fn main() -> anyhow::Result<()> {
     info!("Starting main loop");
     while should_run.load(Ordering::SeqCst) {
         controller.tick()?;
-        thread::sleep(INTERVAL);
+        thread::sleep(LOOP_INTERVAL);
     }
 
     Ok(())

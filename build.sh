@@ -23,5 +23,5 @@ else
     ssh -t $PI_HOST "
         sudo systemctl stop goldfinger;
         cd ./goldfinger;
-        RUST_BACKTRACE=1 sudo -E ./goldfinger"
+        RUST_BACKTRACE=1 RUST_LOG=$RUST_LOG sudo -E ./goldfinger"
 fi

@@ -12,7 +12,8 @@ use linux_embedded_hal::{
     sysfs_gpio::Direction,
     Delay, SpidevDevice, SysfsPin,
 };
-use log::{info, trace};
+use log::{error, info, trace};
+use std::time::{Duration, Instant};
 use u8g2_fonts::{fonts, U8g2TextStyle};
 use weact_studio_epd::{
     graphics::{Display213BlackWhite, DisplayRotation},
@@ -39,6 +40,8 @@ pub struct Display {
     // Logical state
     /// The text currently on the screen
     text_buffer: Vec<u8>,
+    /// When did we last do a full screen update (as opposed to partial)?
+    last_full_update: Instant,
 }
 
 impl Display {
@@ -49,6 +52,10 @@ impl Display {
     /// Y coordinate of the top edge of the screen. The first 6 rows of the
     /// buffer are not visible
     pub const TOP: i32 = 6;
+
+    /// How frequently to do a full (as opposed to partial) update on the
+    /// screen? The full update cleans up artifacts that accumulate over time.
+    const FULL_UPDATE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24);
 
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =
@@ -84,6 +91,8 @@ impl Display {
             device: controller,
             display,
             text_buffer: Vec::new(),
+            // Ensure we always start with a full update
+            last_full_update: Instant::now() - Self::FULL_UPDATE_INTERVAL,
         })
     }
 
@@ -96,11 +105,17 @@ impl Display {
     pub fn draw(&mut self) -> anyhow::Result<()> {
         // If anything changed, update the screen
         if self.display.buffer() != self.text_buffer {
-            trace!("Updating display");
-            self.device.fast_update(&self.display).map_err(map_error)?;
+            let now = Instant::now();
+            if now - self.last_full_update > Self::FULL_UPDATE_INTERVAL {
+                info!("Updating display (full)");
+                self.last_full_update = now;
+                self.device.full_update(&self.display).map_err(map_error)?;
+            } else {
+                trace!("Updating display (fast)");
+                self.device.fast_update(&self.display).map_err(map_error)?;
+            }
             // Store this buffer so we can check if it's changed later
             self.text_buffer = self.display.buffer().to_owned();
-            trace!("Done updating display");
         }
 
         // After attempting a draw, clear no matter what so the next frame is
@@ -115,8 +130,13 @@ impl Drop for Display {
         // Clear the screen on shutdown. A fast refresh leaves ghost text
         // behind, so do a full one
         info!("Clearing display for shutdown");
-        let _ = self.device.clear_bw_buffer();
-        let _ = self.device.full_refresh();
+
+        self.display.clear(Color::White);
+        let result = self.device.full_update(&self.display);
+        if let Err(error) = result {
+            error!("Failed to clear display on shutdown: {error:?}")
+        }
+        info!("Done clearing display");
     }
 }
 

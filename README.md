@@ -1,6 +1,8 @@
 # Goldfinger
 
-_No Mr. Bond, I expect you to show the current time and/or weather forecast._
+> Do you expect me to talk?
+>
+> No Mr. Bond, I expect you to show me the current local weather and transit predictions!
 
 This is a control system for a Raspberry Pi with an e-ink display. This was originally based on [Söze](https://github.com/LucasPickering/soze), but is simplified dramatically and rewritten in Rust, with different hardware.
 

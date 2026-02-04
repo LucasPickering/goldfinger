@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use log::{error, info, warn};
 use serde::de::DeserializeOwned;
 use std::{
@@ -57,19 +57,20 @@ where
     /// Spawn a task to fetch the latest forecase in the background
     fn fetch_latest(&self) {
         let lock = Arc::clone(&self.data);
-        let request = ureq::get(&self.url);
+        let url = self.url.clone();
+        let request = ureq::get(&url);
 
         thread::spawn(move || {
-            let url = request.url().to_owned();
             // Shitty try block
             let result: anyhow::Result<()> = (|| {
                 info!("Fetching new data from {url}");
-                let response = request.call().with_context(|| {
+                let mut response = request.call().with_context(|| {
                     format!("Error fetching data from {url}")
                 })?;
-                let data: T = response.into_json().with_context(|| {
-                    format!("Error parsing data from {url} as JSON")
-                })?;
+                let data: T =
+                    response.body_mut().read_json().with_context(|| {
+                        format!("Error parsing data from {url} as JSON")
+                    })?;
 
                 // Stringify the error to dump the lifetime
                 *lock.write().map_err(|err| anyhow!("{err}"))? =

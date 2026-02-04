@@ -1,6 +1,6 @@
 [package]
 description = "Control system for a Raspberry Pi with e-ink display"
-edition = "2021"
+edition = "2024"
 name = "goldfinger"
 version = "0.1.0"
 
@@ -19,8 +19,8 @@ log = "0.4.20"
 serde = {version = "1.0.195", features = ["derive"]}
 serde_json = {version = "1.0.111", default-features = false}
 u8g2-fonts = {version = "0.5.1", features = ["embedded_graphics_textstyle"]}
-ureq = {version = "2.9.6", features = ["json"]}
+ureq = {version = "3.1.4", features = ["json"]}
 weact-studio-epd = {version = "0.1.2", features = ["blocking"]}
 
-[target.'cfg(target_arch = "arm")'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 linux-embedded-hal = "0.4.0"

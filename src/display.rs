@@ -55,7 +55,7 @@ impl Display {
 
     /// How frequently to do a full (as opposed to partial) update on the
     /// screen? The full update cleans up artifacts that accumulate over time.
-    const FULL_UPDATE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24);
+    const FULL_UPDATE_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =

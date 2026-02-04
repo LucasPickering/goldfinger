@@ -1,4 +1,4 @@
 [toolchain]
 channel = "1.83.0"
-components = ["cargo", "clippy", "rustfmt"]
+components = ["cargo", "clippy", "rustfmt", "rust-analyzer"]
 targets = ["arm-unknown-linux-musleabihf"]

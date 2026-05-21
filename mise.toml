@@ -2,23 +2,24 @@
 PI_DIR = "/home/pi/goldfinger"
 PI_HOST = "pi@192.168.0.64"
 PI_TARGET = "arm-unknown-linux-musleabihf"
-BINARY_PATH = "target/{{env.PI_TARGET}}/release/goldfinger"
 RUST_BACKTRACE = 1
+
+BINARY_PATH = "target/{{env.PI_TARGET}}/release/goldfinger"
 
 [tasks.build]
 description = "Build for the Pi"
-sources = ["Cargo.toml", "Cargo.lock", "src/**/*.rs"]
 outputs = ["{{env.BINARY_PATH}}"]
 run = "cargo build --release --target {{env.PI_TARGET}}"
+sources = ["Cargo.toml", "Cargo.lock", "src/**/*.rs"]
 
 [tasks.copy]
 depends = ["build"]
 description = "Copy build files to the Pi"
-sources = ["goldfinger.service", "config.json", "{{env.BINARY_PATH}}"]
 run = [
-    """rsync -r -vv \
+  """rsync -r -vv \
     goldfinger.service config.json {{env.BINARY_PATH}} {{env.PI_HOST}}:{{env.PI_DIR}}""",
 ]
+sources = ["goldfinger.service", "config.json", "{{env.BINARY_PATH}}"]
 
 [tasks.deploy]
 depends = ["copy"]
@@ -38,3 +39,7 @@ run = """ssh -t $PI_HOST "
     cd ./goldfinger;
     RUST_BACKTRACE=1 sudo -E ./goldfinger"
 """
+
+[tasks.ssh]
+description = "SSH into the Pi"
+run = "ssh $PI_HOST"

@@ -2,9 +2,9 @@
 
 > Do you expect me to talk?
 >
-> No Mr. Bond, I expect you to show me the current local weather and transit predictions!
+> No Mr. Bond, I expect you to show me the current local weather!
 
-This is a control system for a Raspberry Pi with an e-ink display. This was originally based on [Söze](https://github.com/LucasPickering/soze), but is simplified dramatically and rewritten in Rust, with different hardware.
+This is a control system for a Raspberry Pi with an e-ink display. This was originally based on [Söze](https://github.com/LucasPickering/soze), but has since been simplified dramatically and rewritten in Rust, with different hardware.
 
 ## Software
 
@@ -30,16 +30,16 @@ From a fresh RPi OS installation, you'll need to enable both **SPI** and **GPIO 
 
 ### Deployment
 
-The executable is cross-compiled for the Raspberry Pi, then copied over with a script. Make sure you installed the correct linker in the prerequisites.
+The executable is cross-compiled for the Raspberry Pi, then copied over with a script.
 
 To run the program on the Pi with a live SSH session, run:
 
 ```sh
-./build.sh
+mise dev
 ```
 
 To spawn the systemctl service and run it in the background:
 
 ```sh
-./build.sh --release
+mise deploy
 ```

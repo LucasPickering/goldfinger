@@ -10,7 +10,7 @@ pub struct Weather {
 }
 
 impl Weather {
-    const FORECAST_TTL: Duration = Duration::from_secs(60);
+    const FORECAST_TTL: Duration = Duration::from_secs(60 * 10);
     const API_HOST: &'static str = "https://api.weather.gov";
     // Start and end (inclusive) of forecast times that *should* be shown.
     // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441

@@ -1,33 +1,29 @@
 mod config;
 mod display;
-mod transit;
 mod util;
 mod weather;
 
 use crate::{
     config::Config,
-    display::{text, Display, FontSize},
-    transit::Transit,
+    display::{Display, FontSize, text},
     weather::Weather,
 };
 use anyhow::Context;
 use embedded_graphics::{
-    geometry::AnchorX,
-    prelude::{Dimensions, Point},
-    text::Alignment,
+    geometry::AnchorX, prelude::Dimensions, text::Alignment,
 };
-use log::{info, trace, warn, LevelFilter};
+use log::{LevelFilter, info, trace, warn};
 use std::{
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     thread,
     time::Duration,
 };
 
 /// Frequency to recalcuate display contents
-const LOOP_INTERVAL: Duration = Duration::from_millis(1000);
+const LOOP_INTERVAL: Duration = Duration::from_secs(60);
 
 fn main() -> anyhow::Result<()> {
     env_logger::builder()
@@ -59,7 +55,6 @@ fn main() -> anyhow::Result<()> {
 struct Controller {
     display: Display,
     weather: Weather,
-    transit: Transit,
 }
 
 impl Controller {
@@ -70,12 +65,7 @@ impl Controller {
         let config = Config::load()?;
         let display = Display::new(&config)?;
         let weather = Weather::new(&config);
-        let transit = Transit::new(&config);
-        Ok(Self {
-            display,
-            weather,
-            transit,
-        })
+        Ok(Self { display, weather })
     }
 
     fn tick(&mut self) -> anyhow::Result<()> {
@@ -130,24 +120,6 @@ impl Controller {
                     Alignment::Left,
                 ));
             }
-        }
-
-        // Transit
-        let predictions = self.transit.predictions();
-        let mut next = Point::new(Display::RIGHT, Display::TOP);
-        for line in predictions.lines {
-            next = self.display.draw_text(&text(
-                &format!(
-                    "{}\n{}\n{}\n",
-                    line.name, line.inbound, line.outbound
-                ),
-                next,
-                FontSize::Medium,
-                Alignment::Right,
-            ));
-            // The returned x is a bit shifted for some reason, so reset it
-            next.x = Display::RIGHT;
-            next.y += 8; // Padding between lines
         }
     }
 }

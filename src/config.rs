@@ -1,4 +1,3 @@
-use crate::transit::TransitLine;
 use anyhow::Context;
 use log::info;
 use serde::Deserialize;
@@ -9,7 +8,6 @@ pub struct Config {
     pub display_port: String,
     pub forecast_office: String,
     pub forecast_gridpoint: (u32, u32),
-    pub transit_lines: Vec<TransitLine>,
 }
 
 impl Config {

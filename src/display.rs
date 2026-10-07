@@ -12,8 +12,7 @@ use linux_embedded_hal::{
     spidev::{SpiModeFlags, SpidevOptions},
     sysfs_gpio::Direction,
 };
-use log::{error, info, trace};
-use std::time::{Duration, Instant};
+use log::{error, info};
 use u8g2_fonts::{U8g2TextStyle, fonts};
 use weact_studio_epd::{
     Color, WeActStudio213BlackWhiteDriver,
@@ -40,8 +39,6 @@ pub struct Display {
     // Logical state
     /// The text currently on the screen
     text_buffer: Vec<u8>,
-    /// When did we last do a full screen update (as opposed to partial)?
-    last_full_update: Instant,
 }
 
 impl Display {
@@ -50,10 +47,6 @@ impl Display {
     /// Y coordinate of the top edge of the screen. The first 6 rows of the
     /// buffer are not visible
     pub const TOP: i32 = 6;
-
-    /// How frequently to do a full (as opposed to partial) update on the
-    /// screen? The full update cleans up artifacts that accumulate over time.
-    const FULL_UPDATE_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let mut spi =
@@ -89,8 +82,6 @@ impl Display {
             device: controller,
             display,
             text_buffer: Vec::new(),
-            // Ensure we always start with a full update
-            last_full_update: Instant::now() - Self::FULL_UPDATE_INTERVAL,
         })
     }
 
@@ -103,15 +94,8 @@ impl Display {
     pub fn draw(&mut self) -> anyhow::Result<()> {
         // If anything changed, update the screen
         if self.display.buffer() != self.text_buffer {
-            let now = Instant::now();
-            if now - self.last_full_update > Self::FULL_UPDATE_INTERVAL {
-                info!("Updating display (full)");
-                self.last_full_update = now;
-                self.device.full_update(&self.display).map_err(map_error)?;
-            } else {
-                trace!("Updating display (fast)");
-                self.device.fast_update(&self.display).map_err(map_error)?;
-            }
+            info!("Updating display");
+            self.device.full_update(&self.display).map_err(map_error)?;
             // Store this buffer so we can check if it's changed later
             self.text_buffer = self.display.buffer().to_owned();
         }

@@ -21,7 +21,7 @@ I haven't figured out to run this locally, it needs some hardware mocking. Usual
 
 ### Prerequisites
 
-- `brew install filosottile/musl-cross/musl-cross --build-from-source --without-x86_64 --without-aarch64 --with-arm-hf` (for deployment only)
+- `brew install filosottile/musl-cross/musl-cross` (for deployment only)
   - https://github.com/FiloSottile/homebrew-musl-cross
 
 ### Pi Setup

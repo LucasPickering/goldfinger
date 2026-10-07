@@ -1,23 +1,23 @@
 use crate::config::Config;
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use display_interface::DisplayError;
 use display_interface_spi::SPIInterface;
 use embedded_graphics::{
+    Drawable,
     geometry::Point,
     text::{Alignment, Baseline, LineHeight, TextStyleBuilder},
-    Drawable,
 };
 use linux_embedded_hal::{
+    Delay, SpidevDevice, SysfsPin,
     spidev::{SpiModeFlags, SpidevOptions},
     sysfs_gpio::Direction,
-    Delay, SpidevDevice, SysfsPin,
 };
 use log::{error, info, trace};
 use std::time::{Duration, Instant};
-use u8g2_fonts::{fonts, U8g2TextStyle};
+use u8g2_fonts::{U8g2TextStyle, fonts};
 use weact_studio_epd::{
-    graphics::{Display213BlackWhite, DisplayRotation},
     Color, WeActStudio213BlackWhiteDriver,
+    graphics::{Display213BlackWhite, DisplayRotation},
 };
 
 const PIN_BUSY: u64 = 17; // GPIO/BCM 17, pin 11
@@ -47,8 +47,6 @@ pub struct Display {
 impl Display {
     /// X coordinate of the left edge of the screen
     pub const LEFT: i32 = 0;
-    /// X coordinate of the right edge of the screen
-    pub const RIGHT: i32 = 250;
     /// Y coordinate of the top edge of the screen. The first 6 rows of the
     /// buffer are not visible
     pub const TOP: i32 = 6;

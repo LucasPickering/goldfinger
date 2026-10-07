@@ -2,10 +2,14 @@ use anyhow::{Context, anyhow};
 use log::{error, info, warn};
 use serde::de::DeserializeOwned;
 use std::{
-    sync::{Arc, RwLock},
+    sync::{Arc, LazyLock, RwLock},
     thread,
     time::{Duration, Instant},
 };
+use ureq::Agent;
+
+static HTTP_AGENT: LazyLock<Agent> =
+    LazyLock::new(|| ureq::Agent::new_with_defaults());
 
 /// Helper for regularly fetching data from an API
 #[derive(Debug)]
@@ -58,7 +62,7 @@ where
     fn fetch_latest(&self) {
         let lock = Arc::clone(&self.data);
         let url = self.url.clone();
-        let request = ureq::get(&url);
+        let request = HTTP_AGENT.get(&url);
 
         thread::spawn(move || {
             // Shitty try block

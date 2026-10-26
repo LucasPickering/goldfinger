@@ -102,7 +102,7 @@ impl Controller {
             // Draw current PoP just to the right
             self.display.draw_text(&text(
                 &now.prob_of_precip(),
-                (temperature_right, Display::TOP),
+                (temperature_right + 24, Display::TOP), // Left padding
                 FontSize::Large,
                 Alignment::Left,
             ));

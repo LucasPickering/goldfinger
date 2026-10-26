@@ -58,6 +58,8 @@ struct Controller {
 }
 
 impl Controller {
+    /// Show every n weather periods
+    const WEATHER_FREQUENCY: usize = 2;
     /// Number of weather periods we can show at once
     const WEATHER_PERIODS: usize = 4;
 
@@ -106,7 +108,10 @@ impl Controller {
             ));
 
             // Show the next n periods
-            for period in forecast.future_periods().take(Self::WEATHER_PERIODS)
+            for period in forecast
+                .future_periods()
+                .step_by(Self::WEATHER_FREQUENCY)
+                .take(Self::WEATHER_PERIODS)
             {
                 next = self.display.draw_text(&text(
                     &format!(

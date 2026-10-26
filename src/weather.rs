@@ -16,8 +16,6 @@ impl Weather {
     // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
     const DAY_START: NaiveTime = NaiveTime::from_hms_opt(4, 30, 0).unwrap();
     const DAY_END: NaiveTime = NaiveTime::from_hms_opt(22, 30, 0).unwrap();
-    /// We show every n periods in the future
-    const PERIOD_INTERNAL: usize = 4;
 
     pub fn new(config: &Config) -> Self {
         let url = format!(
@@ -73,15 +71,16 @@ impl Forecast {
         &self.properties.periods[0]
     }
 
-    /// Get the list of periods that should be shown in the list. This skips
-    /// periods in the middle of the night.
+    /// Get the upcoming weather periods
+    ///
+    /// This skips periods in the middle of the night.
     pub fn future_periods(&self) -> impl '_ + Iterator<Item = &ForecastPeriod> {
         let day_range = Weather::DAY_START..=Weather::DAY_END;
         self.properties
             .periods
             .iter()
             .skip(1)
-            .step_by(Weather::PERIOD_INTERNAL)
+            // Skip overnight periods
             .filter(move |period| {
                 day_range.contains(&period.start_time().time())
             })

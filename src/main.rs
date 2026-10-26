@@ -103,7 +103,7 @@ impl Controller {
             self.display.draw_text(&text(
                 &now.prob_of_precip(),
                 (temperature_right, Display::TOP),
-                FontSize::Medium,
+                FontSize::Large,
                 Alignment::Left,
             ));
 
